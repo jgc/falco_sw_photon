@@ -295,14 +295,13 @@ void loop() {
     int batt1 = battF;
     int batt2 = battF2;
     
-      
-    float tempF = theData.value1;
-    tempF = tempF/10;
+    int temp1 = rndInt(theData.value1)/10;
     
+    // Turn above into round function and round min and max
     // ADD ROUND FUNCTION
     float tempF2 = theData.value1;
     tempF2 = tempF2; // was tempF2/10;
-    int temp1 = tempF;
+    
     int temp2 = tempF2;
     
     float tminF2 = theData.value2;
@@ -628,4 +627,20 @@ int cloudResetWifi(String command)
     return 200;
   }
   else return -1;
+}
+
+int rndInt(int intToRnd)
+{
+  int modAdj = 0;
+  if (intToRnd < 0)
+  {
+    modAdj = -intToRnd % 10;
+    if (modAdj >= 5) intToRnd = intToRnd - 5;
+  }
+  if (intToRnd > 0)
+  {
+    modAdj = intToRnd % 10;
+    if (modAdj >= 5) intToRnd = intToRnd + 5;
+  }
+  return intToRnd;
 }
