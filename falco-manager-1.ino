@@ -1,6 +1,7 @@
 // WARNING Initial hack !!!!!
 
 // **** TODO ****
+// Fix rounding of WIRE data
 // Add individual node web reset particle function
 // Add function to add nodes at startup
 // Add function to indicate missing data after say 5 minutes
@@ -437,13 +438,13 @@ void loop() {
     theData.value3 = 0;
     theData.value4 = 0;
    
-    if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData), 1)) { // node must be a byte
-      Serial.println("OK ... temp reset message sent ok");
-      tResetRequested[theNodeID - 1] = 0;
-      } else {
-        Serial.println("Fail ... temp reset message NOT sent");
-        tResetRequested[theNodeID - 1] = 1;
-      }
+  if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData), 2)) { // node must be a byte
+    Serial.println("OK ... temp reset message sent ok");
+    tResetRequested[theNodeID - 1] = 0;
+    } else {
+      Serial.println("Fail ... temp reset message NOT sent");
+      tResetRequested[theNodeID - 1] = 1;
+    }
   }
 
   #ifdef DEBUG_MIN  
