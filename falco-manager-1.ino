@@ -167,6 +167,7 @@ void setup() {
   Wire.write(valueSU);
   delay(100);  // try to fix i2c issue
   Wire.endTransmission(true);    // stop transmitting
+  delay(100);  // try to fix i2c issue
   
   mem1 = System.freeMemory();
   Serial.println(mem1);
@@ -228,7 +229,7 @@ void loop() {
     Wire.write(value3);
     delay(100);  // try to fix i2c issue
     Wire.endTransmission(true);    // stop transmitting
-    //delay(100);  // try to fix i2c issue - does not work 
+    delay(100);  // try to fix i2c issue - does not work 
 
     #ifdef DEBUG_MIN  
     Serial.print(Time.timeStr());
@@ -421,7 +422,7 @@ void loop() {
       Wire.write(value2);
       delay(100);  // try to fix i2c issue
       Wire.endTransmission(true);    // stop transmitting
-
+      delay(100);  // try to fix i2c issue
 
       #ifdef DEBUG_ON  
       reboots = EEPROM.read(addr1);
