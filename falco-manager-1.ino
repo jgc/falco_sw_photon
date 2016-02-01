@@ -322,50 +322,51 @@ void loop() {
     battF2 = battF2/10;
     int batt1 = battF;
     int batt2 = battF2;
-    
     int temp1 = rndInt(theData.value1)/10;
     
     // Turn above into round function and round min and max
     // ADD ROUND FUNCTION
-    float tempF2 = theData.value1;
-    tempF2 = tempF2; // was tempF2/10;
+    //float tempF2 = theData.value1;
+    //tempF2 = tempF2; // was tempF2/10;
+    //int temp2 = tempF2;
+    int temp2 = rndInt(theData.value1);
     
-    int temp2 = tempF2;
+    //float tminF2 = theData.value2;
+    //tminF2 = tminF2/10;
+    //int tMin = tminF2;
+    //int tmin2 = tminF2;
+    int tMin = rndInt(theData.value2)/10;
+      
+    //float tmaxF2 = theData.value3;
+    //tmaxF2 = tmaxF2/10;
+    //int tMax = tmaxF2;
+    //int tmax2 = tmaxF2;
+    int tMax = rndInt(theData.value3)/10;
     
-    float tminF2 = theData.value2;
-      tminF2 = tminF2/10;
-      int tMin = tminF2;
-      //int tmin2 = tminF2;
+    int tFlag = 0;
+    if ((temp1 > 200) || (temp1 < 40)) tFlag = 1;
       
-      float tmaxF2 = theData.value3;
-      tmaxF2 = tmaxF2/10;
-      int tMax = tmaxF2;
-      //int tmax2 = tmaxF2;
+    #ifdef DEBUG_ON  
+    Serial.print("\nWire: ");
+    Serial.println("[tran|node|batt|value1|value2|value3|tFlag] = ");
+    #endif
       
-      int tFlag = 0;
-      if ((temp1 > 200) || (temp1 < 40)) tFlag = 1;
-      
-      #ifdef DEBUG_ON  
-      Serial.print("\nWire: ");
-      Serial.println("[tran|node|batt|value1|value2|value3|tFlag] = ");
-      #endif
-      
-      #ifdef DEBUG_MIN      
-      Serial.print(Time.timeStr(lastData[theNodeID - 1]));
-      Serial.print(" [dt|");
-      Serial.print(theNodeID);
-      Serial.print("|");
-      Serial.print(batt1);
-      Serial.print("|");
-      Serial.print(temp1);
-      Serial.print("|");
-      Serial.print(tMin);
-      Serial.print("|");
-      Serial.print(tMax);
-      Serial.print("|");
-      Serial.print(tFlag);
-      Serial.println("]");
-      #endif
+    #ifdef DEBUG_MIN      
+    Serial.print(Time.timeStr(lastData[theNodeID - 1]));
+    Serial.print(" [dt|");
+    Serial.print(theNodeID);
+    Serial.print("|");
+    Serial.print(batt1);
+    Serial.print("|");
+    Serial.print(temp1);
+    Serial.print("|");
+    Serial.print(tMin);
+    Serial.print("|");
+    Serial.print(tMax);
+    Serial.print("|");
+    Serial.print(tFlag);
+    Serial.println("]");
+    #endif
       
       if (tResetCompleted[theNodeID - 1] == 1) {
         tMin = temp1;
