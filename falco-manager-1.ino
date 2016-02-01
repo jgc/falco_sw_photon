@@ -316,31 +316,18 @@ void loop() {
     //rndUpDn(n10, integerDecPlaces1, roundedDecPlaces1);
     // FIX FIX FIX - add loop ete etc
       
-    float battF = theData.batt;
-    battF = battF/100;
-    float battF2 = theData.batt;
-    battF2 = battF2/10;
-    int batt1 = battF;
-    int batt2 = battF2;
+    //float battF = theData.batt;
+    //battF = battF/100;
+    //float battF2 = theData.batt;
+    //battF2 = battF2/10;
+    //int batt1 = battF;
+    //int batt2 = battF2;
+
+    int batt1 = rndInt(theData.batt)/100;
+    int batt2 = rndInt(theData.batt)/10;
     int temp1 = rndInt(theData.value1)/10;
-    
-    // Turn above into round function and round min and max
-    // ADD ROUND FUNCTION
-    //float tempF2 = theData.value1;
-    //tempF2 = tempF2; // was tempF2/10;
-    //int temp2 = tempF2;
     int temp2 = rndInt(theData.value1);
-    
-    //float tminF2 = theData.value2;
-    //tminF2 = tminF2/10;
-    //int tMin = tminF2;
-    //int tmin2 = tminF2;
     int tMin = rndInt(theData.value2)/10;
-      
-    //float tmaxF2 = theData.value3;
-    //tmaxF2 = tmaxF2/10;
-    //int tMax = tmaxF2;
-    //int tmax2 = tmaxF2;
     int tMax = rndInt(theData.value3)/10;
     
     int tFlag = 0;
