@@ -165,8 +165,9 @@ void setup() {
      
   Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
   Wire.write(valueSU);
+  delay(100);  // try to fix i2c issue
   Wire.endTransmission(true);    // stop transmitting
-
+  
   mem1 = System.freeMemory();
   Serial.println(mem1);
   
@@ -184,6 +185,10 @@ void setup() {
     #endif
   }
   
+  nodeDataMissing[4] = true;
+  
+  
+  
 }
 // End setup
 
@@ -191,6 +196,25 @@ void setup() {
 
 void loop() {
 
+  /*  Add timer else too slow
+  for (int i = 0; i < numNodes; i++) {
+    if (nodeDataMissing[i])
+    {
+      String valueX = "md|" + String(i) + "|0|0|0|0|0";
+      //[tran|node|batt|value1|value2|value3|tFlag]
+      Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+      Wire.write(valueX);
+      Wire.endTransmission(true);    // stop transmitting
+      #ifdef DEBUG_MIN  
+      Serial.print(Time.timeStr());
+      Serial.print(" [");
+      Serial.print(valueX);
+      Serial.println("]");
+      #endif
+    }
+  }
+  */
+  
   SW1State = readSW(SW1);
   switchCount();
 
@@ -202,8 +226,10 @@ void loop() {
     String value3 = "rt|999|0|0|0|0|0";
     Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
     Wire.write(value3);
+    delay(100);  // try to fix i2c issue
     Wire.endTransmission(true);    // stop transmitting
-    
+    //delay(100);  // try to fix i2c issue - does not work 
+
     #ifdef DEBUG_MIN  
     Serial.print(Time.timeStr());
     Serial.print(" [");
@@ -393,7 +419,9 @@ void loop() {
 
       Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
       Wire.write(value2);
+      delay(100);  // try to fix i2c issue
       Wire.endTransmission(true);    // stop transmitting
+
 
       #ifdef DEBUG_ON  
       reboots = EEPROM.read(addr1);
