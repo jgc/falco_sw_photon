@@ -5,7 +5,7 @@
 // Add individual node web reset particle function
 // Add function to add nodes at startup
 // Add function to indicate missing data after say 5 minutes
-
+// Fix counter block to sending  data
 
 
 #include "application.h"
@@ -219,7 +219,7 @@ void loop() {
   SW1State = readSW(SW1);
   switchCount();
 
-  if (SW1Counter >= 5){
+  if (SW1Counter >= 1){
     
     // **** FUTURE **** Add web based reset on a per node basis
     
@@ -515,14 +515,15 @@ void switchCount(){
   if (SW1State == 1) {
     ++SW1Counter;
     //int addr = 1;
-    EEPROM.update(addr3, SW1Counter);
+    //EEPROM.update(addr3, SW1Counter);
 
     digitalWrite(LED, HIGH);
     #ifdef DEBUG_ON
     Serial.print("Switch counter = ");
     Serial.println(SW1Counter);
     #endif
-    delay(250);
+    //delay(250);
+    delay(10);
     digitalWrite(LED, LOW);
   }
 }
