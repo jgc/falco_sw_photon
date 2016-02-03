@@ -36,7 +36,7 @@ unsigned int lastPublish = 0;
 //#define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY      "sampleEncryptKey" 
 #define IS_RFM69HW      //uncomment only for RFM69HW! Leave out if you have RFM69W!
-#define ACK_TIME        30 // max # of ms to wait for an ack
+#define ACK_TIME        450 // max # of ms to wait for an ack default 30
 #define SERIAL_BAUD     57600
 #define SW1             D4
 #define buttonPin       D4 //FIX 
@@ -292,7 +292,7 @@ void loop() {
     else
     {
     theData = *(Payload*)radio.DATA; //assume radio.DATA actually contains our struct and not something else
-    #ifdef DEBUG_ON
+    #ifdef DEBUG_MIN
     Serial.print("\nNode=");
     Serial.println(theData.node);
     #endif
@@ -306,7 +306,7 @@ void loop() {
     node = node + nodeRandomizer;
     #endif
     
-    #ifdef DEBUG_ON  
+    #ifdef DEBUG_MIN 
     Serial.print("tran=");
     Serial.println(theData.tran);
     #endif 
@@ -429,24 +429,27 @@ void loop() {
         Serial.println(" - NO ACK sent.");
     }
   
-  #ifdef DEBUG_ON
+  #ifdef DEBUG_MIN
   Serial.print("tResetRequested = ");
   Serial.println(tResetRequested[theNodeID - 1]);
   #endif
   
-  radio.receiveDone(); //put radio in RX mode
+  //***radio.receiveDone(); //put radio in RX mode
   //Serial.flush(); //make sure all serial data is clocked out before sleeping the MCU
   
-  #ifdef DEBUG_ON 
+  #ifdef DEBUG_MIN
   Serial.print("theNodeID = ");
   Serial.println(theNodeID);
   #endif
   
+  //delay(300);
   //delay(10);
-  delay(2); // seems to give best results with reset
+  //delay(2); // seems to give best results with reset
   //resetTemp = 1;
-  
-  if (tResetRequested[theNodeID - 1] == 1) {
+  int nID = 0;
+  nID = theNodeID - 1;
+
+  if (tResetRequested[nID] == 1) {
     theData.node = theNodeID;
     theData.tran = 99;
     theData.batt = 0;
@@ -454,16 +457,47 @@ void loop() {
     theData.value2 = 0;
     theData.value3 = 0;
     theData.value4 = 0;
+    Serial.print(" ..Node = ");
+    Serial.println(theData.node);
+    Serial.print("Tran = ");
+    Serial.println(theData.tran);
+  } else {
+    theData.node = theNodeID;
+    theData.tran = 3;
+    theData.batt = 0;
+    theData.value1 = 0;
+    theData.value2 = 0;
+    theData.value3 = 0;
+    theData.value4 = 0;
+    Serial.print(" ..Node = ");
+    Serial.println(theData.node);
+    Serial.print("Tran = ");
+    Serial.println(theData.tran);
+  }   
    
-  if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData), 2)) { // node must be a byte
+  if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData)), 1) { // node must be a byte
     Serial.println("OK ... temp reset message sent ok");
-    tResetRequested[theNodeID - 1] = 0;
+    Serial.print("Node = ");
+    nID = theNodeID - 1;
+    Serial.println(theNodeID, DEC);
+    Serial.println(nID);
+    tResetRequested[nID] = 0;
     } else {
       Serial.println("Fail ... temp reset message NOT sent");
-      tResetRequested[theNodeID - 1] = 1;
+      //tResetRequested[theNodeID - 1] = 1;
+      tResetRequested[nID] = 0;
     }
-  }
+  //**}
 
+  #ifdef DEBUG_MIN          
+  for (int i = 0; i < numNodes; i++) {
+    Serial.print("tResetRequested [node ");
+    Serial.print(i + 1);
+    Serial.print("] = ");
+    Serial.println(tResetRequested[i]);
+  }
+   #endif
+    
   #ifdef DEBUG_MIN  
   mem1 = System.freeMemory();
   Serial.print("Free memory=");
