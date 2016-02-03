@@ -1,11 +1,11 @@
 // WARNING Initial hack !!!!!
 
 // **** TODO ****
-// Fix rounding of WIRE data
+// 
 // Add individual node web reset particle function
 // Add function to add nodes at startup
 // Add function to indicate missing data after say 5 minutes
-// Fix counter block to sending  data
+//
 
 
 #include "application.h"
@@ -20,10 +20,11 @@ PRODUCT_ID(162);
 //#define DEBUG_ON        //DEBUG is defined so cannot use)
 #define DEBUG_MIN
 
-#define serialTitle "\n\nswitch-led-test_1\n*****************\n"
-#define sVersion "20150724_03"
-#define hVersion "20150724_01"
-#define hDesc "FalcoA Monitor - Prototype"
+#define sDesc "Falco Manager"
+#define sVersion "v0.5.1"
+#define hVersion "v0.5.0"
+#define tStars "***************************"
+
 
 #define led_delay 500
 
@@ -100,11 +101,23 @@ uint8_t numNodes = 9;
 
 //**** START SETUP ****
 void setup() {
+  
+  Serial.println("");
+  Serial.println("");
+  Serial.println(tStars);
+  Serial.print("Decription: ");
+  Serial.println(sDesc);
+  Serial.print("Software version: ");
+  Serial.println(sVersion);
+  Serial.print("Hardware version: ");
+  Serial.println(hVersion);
+  Serial.println("");
+  
   Particle.function("resetWifi", cloudResetWifi);
   Particle.function("resetReboots", cloudResetReboots);  
-  //Particle.variable("sVersion", sVersion, STRING);
-  //Particle.variable("hVersion", hVersion, STRING);
-  //Particle.variable("hDesc", hDesc, STRING);
+  Particle.variable("sVersion", sVersion, STRING);
+  Particle.variable("hVersion", hVersion, STRING);
+  Particle.variable("sDesc", sDesc, STRING);
   //Particle.variable("SW1State", &SW1State, INT);
   //Particle.variable("SW1Counter", &SW1Counter, INT);
   Particle.variable("reboots", &reboots, INT);
@@ -169,26 +182,29 @@ void setup() {
   Wire.endTransmission(true);    // stop transmitting
   delay(100);  // try to fix i2c issue
   
+
   mem1 = System.freeMemory();
+  Serial.print("Free memory:"); 
   Serial.println(mem1);
   
   if (radio.sendWithRetry(theNodeID, "Hi", 2)) //target node Id, message as string or byte array, message length
       Serial.println("Hi received");
       
-  // REMOVE ONCE FIX ADDED
+  nodeDataMissing[4] = true;
+  
   for (int i = 0; i < numNodes; i++) {
     nodePresent[i] = 1;
     #ifdef DEBUG_MIN          
-    Serial.print("tResetRequested [node ");
+    Serial.print("nodePresent [node ");
     Serial.print(i + 1);
     Serial.print("] = ");
-    Serial.println(tResetRequested[i]);
+    Serial.println(nodePresent[i]);
     #endif
   }
+  Serial.println(""); 
   
-  nodeDataMissing[4] = true;
-  
-  
+  Serial.println("Startup completed ... "); 
+  Serial.println(tStars);
   
 }
 // End setup
@@ -261,7 +277,7 @@ void loop() {
   {
 #ifdef DEBUG_MIN 
     Serial.println("");
-    Serial.print("\nAt ");
+    Serial.print("At ");
     Serial.println(Time.timeStr());
     Serial.print('[');
     Serial.print(radio.SENDERID, DEC);
@@ -286,14 +302,14 @@ void loop() {
       Serial.print(sizeof(Payload));
       Serial.print(" / radio.DATALEN = ");
       Serial.print(radio.DATALEN);
-      Serial.print("] Invalid payload received, not matching Payload struct!");
+      Serial.println("] Invalid payload received, not matching Payload struct!");
       #endif
     }
     else
     {
     theData = *(Payload*)radio.DATA; //assume radio.DATA actually contains our struct and not something else
     #ifdef DEBUG_MIN
-    Serial.print("\nNode=");
+    Serial.print("Node=");
     Serial.println(theData.node);
     #endif
     
@@ -311,18 +327,6 @@ void loop() {
     Serial.println(theData.tran);
     #endif 
      
-    // ***************** 
-    // ADD: Roundup and down logic
-    //rndUpDn(n10, integerDecPlaces1, roundedDecPlaces1);
-    // FIX FIX FIX - add loop ete etc
-      
-    //float battF = theData.batt;
-    //battF = battF/100;
-    //float battF2 = theData.batt;
-    //battF2 = battF2/10;
-    //int batt1 = battF;
-    //int batt2 = battF2;
-
     int batt1 = rndInt(theData.batt)/100;
     int batt2 = rndInt(theData.batt)/10;
     int temp1 = rndInt(theData.value1)/10;
@@ -333,8 +337,9 @@ void loop() {
     int tFlag = 0;
     if ((temp1 > 200) || (temp1 < 40)) tFlag = 1;
       
-    #ifdef DEBUG_ON  
-    Serial.print("\nWire: ");
+    #ifdef DEBUG_ON
+    Serial.println("");
+    Serial.print("Wire: ");
     Serial.println("[tran|node|batt|value1|value2|value3|tFlag] = ");
     #endif
       
@@ -434,18 +439,11 @@ void loop() {
   Serial.println(tResetRequested[theNodeID - 1]);
   #endif
   
-  //***radio.receiveDone(); //put radio in RX mode
-  //Serial.flush(); //make sure all serial data is clocked out before sleeping the MCU
-  
   #ifdef DEBUG_MIN
   Serial.print("theNodeID = ");
   Serial.println(theNodeID);
   #endif
   
-  //delay(300);
-  //delay(10);
-  //delay(2); // seems to give best results with reset
-  //resetTemp = 1;
   int nID = 0;
   nID = theNodeID - 1;
 
@@ -458,8 +456,8 @@ void loop() {
     theData.value3 = 0;
     theData.value4 = 0;
     Serial.print(" ..Node = ");
-    Serial.println(theData.node);
-    Serial.print("Tran = ");
+    Serial.print(theData.node);
+    Serial.print(", Tran = ");
     Serial.println(theData.tran);
   } else {
     theData.node = theNodeID;
@@ -470,22 +468,18 @@ void loop() {
     theData.value3 = 0;
     theData.value4 = 0;
     Serial.print(" ..Node = ");
-    Serial.println(theData.node);
-    Serial.print("Tran = ");
+    Serial.print(theData.node);
+    Serial.print(", Tran = ");
     Serial.println(theData.tran);
   }   
    
   if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData)), 1) { // node must be a byte
     Serial.println("OK ... temp reset message sent ok");
-    Serial.print("Node = ");
-    nID = theNodeID - 1;
-    Serial.println(theNodeID, DEC);
-    Serial.println(nID);
     tResetRequested[nID] = 0;
     } else {
       Serial.println("Fail ... temp reset message NOT sent");
       //tResetRequested[theNodeID - 1] = 1;
-      tResetRequested[nID] = 0;
+      tResetRequested[nID] = 1;
     }
   //**}
 
@@ -572,7 +566,6 @@ void SW_startup() {
 #ifdef DEBUG_MIN
   Time.zone(0);
   Serial.println(Time.timeStr());
-  Serial.println("Switch LED test - startup completed\n");
 #endif
   Wire.begin();
 }
