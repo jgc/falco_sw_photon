@@ -5,13 +5,14 @@
 // Add individual node web reset particle function
 // Add function to add nodes at startup
 // Add function to indicate missing data after say 5 minutes
-//
+// Improve sequencing of data transmissions, ACKs and checks for connectivity
 
 
 #include "application.h"
 #include "RFM69.h"
 #include "RFM69registers.h"
-#define  OTHER_ADDRESS 0x04 // 
+
+SYSTEM_MODE(SEMI_AUTOMATIC);
 
 PRODUCT_VERSION(2);
 PRODUCT_ID(162);
@@ -25,6 +26,7 @@ PRODUCT_ID(162);
 #define hVersion "v0.5.0"
 #define tStars "***************************"
 
+#define  OTHER_ADDRESS 0x04 
 
 #define led_delay 500
 
@@ -192,9 +194,10 @@ void setup() {
       
   nodeDataMissing[4] = true;
   
+  //Mark all nodes as present - FUTURE allow for only specified devices to be added
   for (int i = 0; i < numNodes; i++) {
     nodePresent[i] = 1;
-    #ifdef DEBUG_MIN          
+    #ifdef DEBUG_ON          
     Serial.print("nodePresent [node ");
     Serial.print(i + 1);
     Serial.print("] = ");
@@ -206,13 +209,23 @@ void setup() {
   Serial.println("Startup completed ... "); 
   Serial.println(tStars);
   
+
 }
+
+// End setup
+// End setup
 // End setup
 
 
 
 void loop() {
 
+  if (!Particle.connected() && ((wifiOff % 4) == 0))
+        Particle.connect();
+
+  if (Particle.connected())
+    Particle.process();
+    
   /*  Add timer else too slow
   for (int i = 0; i < numNodes; i++) {
     if (nodeDataMissing[i])
@@ -378,19 +391,20 @@ void loop() {
       String value1 = "{ \"node\": \"" + String(theData.node) + "\", \"volts\": \"" + String(batt2) + "\", \"temp1\": \"" + String(temp2) + "\", \"sVersion\": \"" + String(SW1Counter) + "\"  }";
       String value2 = "dt|" + String(theNodeID) + "|" + String(batt1) + "|" + String(temp1) + "|" + String(tMin) + "|" + String(tMax)  + "|" + String(tFlag);
       
-      #ifdef DEBUG_ON
+      #ifdef DEBUG_MIN
       Serial.println("Pinging started...");
       #endif
       numberOfReceivedPackage = 0;
       numberOfReceivedPackage = WiFi.ping(remoteIP);
-      #ifdef DEBUG_ON
+      #ifdef DEBUG_MIN
       Serial.println("Pinging ended ->");
       Serial.println(numberOfReceivedPackage);
       #endif
       
       bool success;
+        
       success = Particle.publish("temperature1", value1, 60, PRIVATE);
-
+      
 #ifdef DEBUG_MIN  
       if (success) {
         Serial.println("'temperature1' Particle.publish - success");
@@ -689,4 +703,11 @@ int rndInt(int intToRnd)
     if (modAdj >= 5) intToRnd = intToRnd + 5;
   }
   return intToRnd;
+}
+
+
+void connect() {
+  if (Particle.connected() == false) {
+    Particle.connect();
+  }
 }
