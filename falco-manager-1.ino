@@ -12,7 +12,8 @@
 #include "RFM69.h"
 #include "RFM69registers.h"
 
-SYSTEM_MODE(SEMI_AUTOMATIC);
+//SYSTEM_MODE(SEMI_AUTOMATIC);
+//SYSTEM_MODE(AUTOMATIC);
 
 PRODUCT_VERSION(2);
 PRODUCT_ID(162);
@@ -22,7 +23,7 @@ PRODUCT_ID(162);
 #define DEBUG_MIN
 
 #define sDesc "Falco Manager"
-#define sVersion "v0.5.1"
+#define sVersion "v0.5.2"
 #define hVersion "v0.5.0"
 #define tStars "***************************"
 
@@ -99,10 +100,24 @@ boolean tResetRequested[9];
 boolean tResetCompleted[9];
 uint8_t numNodes = 9;
 
-
-
+#define MINUTES_1 (1 * 60 * 1000)
+#define MINUTES_2 (2 * 60 * 1000)
+#define MINUTES_5 (5 * 60 * 1000)
+unsigned long lastDataCheck = millis();
+  
+  
+  
+//**** START SETUP ****
+//**** START SETUP ****
 //**** START SETUP ****
 void setup() {
+
+  if (Particle.connected())
+  {
+    Particle.process();
+  } 
+  
+  Serial.begin(9600);
   
   Serial.println("");
   Serial.println("");
@@ -224,26 +239,38 @@ void loop() {
         Particle.connect();
 
   if (Particle.connected())
+  {
     Particle.process();
+  }  
+  
+  
+  if (millis() - lastDataCheck > MINUTES_2) { //ADD FIX for millis turning over to 0 
+    lastDataCheck = millis();
+    #ifdef DEBUG_ON
+    Serial.println("millis() check ...");
+    #endif
     
-  /*  Add timer else too slow
-  for (int i = 0; i < numNodes; i++) {
-    if (nodeDataMissing[i])
+    for (int i = 0; i < numNodes; i++) 
     {
-      String valueX = "md|" + String(i) + "|0|0|0|0|0";
-      //[tran|node|batt|value1|value2|value3|tFlag]
-      Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-      Wire.write(valueX);
-      Wire.endTransmission(true);    // stop transmitting
-      #ifdef DEBUG_MIN  
-      Serial.print(Time.timeStr());
-      Serial.print(" [");
-      Serial.print(valueX);
-      Serial.println("]");
-      #endif
+      if ((lastData[i] != 0) && (lastDataCheck - lastData[i] > MINUTES_2) && (nodeDataMissing[i] == 0))
+      {
+        nodeDataMissing[i] = 1;
+        String wireMD = "md|" + String(i) + "|0|0|0|0|0";
+        //[tran|node|batt|value1|value2|value3|tFlag]
+        Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+        Wire.write(wireMD);
+        Wire.endTransmission(true);    // stop transmitting
+        #ifdef DEBUG_MIN      
+        Serial.print("Node ");
+        Serial.print(i + 1);
+        Serial.print(" data out of date. Sent [");
+        Serial.print(wireMD);
+        Serial.println("]");
+        #endif
+      }
     }
   }
-  */
+  
   
   SW1State = readSW(SW1);
   switchCount();
@@ -260,7 +287,7 @@ void loop() {
     Wire.endTransmission(true);    // stop transmitting
     delay(100);  // try to fix i2c issue - does not work 
 
-    #ifdef DEBUG_MIN  
+    #ifdef DEBUG_ON  
     Serial.print(Time.timeStr());
     Serial.print(" [");
     Serial.print(value3);
@@ -272,7 +299,7 @@ void loop() {
       {
         tResetRequested[i] = 1;
         tResetCompleted[i] = 1;
-        #ifdef DEBUG_MIN          
+        #ifdef DEBUG_ON         
         Serial.print("tResetRequested [node ");
         Serial.print(i + 1);
         Serial.print("] = ");
@@ -327,7 +354,9 @@ void loop() {
     #endif
     
     theNodeID = theData.node;
-    lastData[theNodeID - 1] = Time.now();   
+    //lastData[theNodeID - 1] = Time.now();   
+    lastData[theNodeID - 1] = millis();  // time may not be reliable if device starts up disconnected from the web   
+    nodeDataMissing[theNodeID - 1] = 0; //since data is retrived do not need to send 
     
     #ifdef RANDOMDATA
     uint8_t nodeRandomizer;
@@ -497,7 +526,7 @@ void loop() {
     }
   //**}
 
-  #ifdef DEBUG_MIN          
+  #ifdef DEBUG_ON          
   for (int i = 0; i < numNodes; i++) {
     Serial.print("tResetRequested [node ");
     Serial.print(i + 1);
@@ -506,6 +535,17 @@ void loop() {
   }
    #endif
     
+    
+  #ifdef DEBUG_ON          
+  for (int i = 0; i < numNodes; i++) {
+    Serial.print("lastData [node ");
+    Serial.print(i + 1);
+    Serial.print("] = ");
+    Serial.println(lastData[i]);
+  }
+  #endif
+   
+   
   #ifdef DEBUG_MIN  
   mem1 = System.freeMemory();
   Serial.print("Free memory=");
@@ -561,7 +601,6 @@ void switchCount(){
 
 
 void SW_startup() {
-  Serial.begin(57600);
 
 #ifdef DEBUG_ON  
   Serial.println(sVersion);
@@ -672,7 +711,6 @@ int cloudResetReboots(String command)
 
 
 
-
 int cloudResetWifi(String command)
 {
   // look for the matching argument "coffee" <-- max of 64 characters long
@@ -704,6 +742,7 @@ int rndInt(int intToRnd)
   }
   return intToRnd;
 }
+
 
 
 void connect() {
