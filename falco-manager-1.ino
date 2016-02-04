@@ -1,11 +1,11 @@
 // WARNING Initial hack !!!!!
 
 // **** TODO ****
-// 
 // Add individual node web reset particle function
 // Add function to add nodes at startup
 // Add function to indicate missing data after say 5 minutes
 // Improve sequencing of data transmissions, ACKs and checks for connectivity
+//
 
 
 #include "application.h"
