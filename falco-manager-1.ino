@@ -191,7 +191,7 @@ void setup() {
   #endif
   
   String valueSU;
-  valueSU = "te|1|3|Startup at " + String(Time.timeStr());
+  valueSU = "te|0|1|3|Startup at " + String(Time.timeStr()) + "|0|0";
      
   Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
   Wire.write(valueSU);
