@@ -12,7 +12,7 @@
 #include "RFM69.h"
 #include "RFM69registers.h"
 
-//SYSTEM_MODE(SEMI_AUTOMATIC);
+SYSTEM_MODE(SEMI_AUTOMATIC);
 //SYSTEM_MODE(AUTOMATIC);
 
 PRODUCT_VERSION(2);
@@ -20,7 +20,7 @@ PRODUCT_ID(162);
 
 //#define RANDOMDATA
 //#define DEBUG_ON        //DEBUG is defined so cannot use)
-#define DEBUG_MIN
+//#define DEBUG_MIN
 
 #define sDesc "Falco Manager"
 #define sVersion "v0.5.2"
@@ -41,7 +41,7 @@ unsigned int lastPublish = 0;
 #define ENCRYPTKEY      "sampleEncryptKey" 
 #define IS_RFM69HW      //uncomment only for RFM69HW! Leave out if you have RFM69W!
 #define ACK_TIME        450 // max # of ms to wait for an ack default 30
-#define SERIAL_BAUD     57600
+#define SERIAL_BAUD     9600 // 57600
 #define SW1             D4
 #define buttonPin       D4 //FIX 
 #define LED             D7 
@@ -117,8 +117,9 @@ void setup() {
     Particle.process();
   } 
   
-  Serial.begin(9600);
+  Serial.begin(SERIAL_BAUD);
   
+  //#ifdef DEBUG_MIN      
   Serial.println("");
   Serial.println("");
   Serial.println(tStars);
@@ -129,6 +130,7 @@ void setup() {
   Serial.print("Hardware version: ");
   Serial.println(hVersion);
   Serial.println("");
+  //#endif
   
   Particle.function("resetWifi", cloudResetWifi);
   Particle.function("resetReboots", cloudResetReboots);  
@@ -149,8 +151,8 @@ void setup() {
   Particle.subscribe("hook-response/temperature1", tempResponse, MY_DEVICES);
   pinMode(LED, OUTPUT);
   
-  Serial.begin(SERIAL_BAUD);
-  delay(10);
+  //Serial.begin(SERIAL_BAUD);
+  //delay(10);
  
   radio.initialize(FREQUENCY,NODEID,NETWORKID);
 #ifdef IS_RFM69HW
@@ -201,8 +203,10 @@ void setup() {
   
 
   mem1 = System.freeMemory();
+  #ifdef DEBUG_MIN  
   Serial.print("Free memory:"); 
   Serial.println(mem1);
+  #endif
   
   if (radio.sendWithRetry(theNodeID, "Hi", 2)) //target node Id, message as string or byte array, message length
       Serial.println("Hi received");
@@ -219,14 +223,14 @@ void setup() {
     Serial.println(nodePresent[i]);
     #endif
   }
-  Serial.println(""); 
   
+  #ifdef DEBUG_MIN 
+  Serial.println(""); 
   Serial.println("Startup completed ... "); 
   Serial.println(tStars);
-  
+  #endif
 
 }
-
 // End setup
 // End setup
 // End setup
@@ -406,12 +410,14 @@ void loop() {
         tMin = temp1;
         tMax = temp1;
         tResetCompleted[theNodeID - 1] = 0;
+        #ifdef DEBUG_MIN
         Serial.print(temp1);
         Serial.print("|");
         Serial.print(tMin);
         Serial.print("|");
         Serial.print(tMax);
         Serial.print("|");
+        #endif
       }
       
       Serial.println();
@@ -431,28 +437,28 @@ void loop() {
       #endif
       
       bool success;
-        
       success = Particle.publish("temperature1", value1, 60, PRIVATE);
       
-#ifdef DEBUG_MIN  
+      #ifdef DEBUG_MIN  
       if (success) {
         Serial.println("'temperature1' Particle.publish - success");
       } else {
         Serial.println("'temperature1' Particle.publish - failed");
       }
-#endif
+      #endif
+      
       if (!success) {
         wifiOff++;   
         EEPROM.update(addr2, wifiOff);
-#ifdef DEBUG_MIN 
+        #ifdef DEBUG_MIN 
         Serial.println("wifiOff updated");
-#endif
+        #endif
         }
       
-#ifdef DEBUG_ON  
+      #ifdef DEBUG_ON  
       Serial.print("wifi disconnects = ");
       Serial.println(wifiOff);
-#endif
+      #endif
 
       Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
       Wire.write(value2);
@@ -472,9 +478,13 @@ void loop() {
   if (radio.ACK_REQUESTED)
    {
         radio.sendACK();
+        #ifdef DEBUG_MIN
         Serial.println(" - ACK sent.");
+        #endif
     } else {
+        #ifdef DEBUG_MIN
         Serial.println(" - NO ACK sent.");
+        #endif
     }
   
   #ifdef DEBUG_MIN
@@ -498,10 +508,12 @@ void loop() {
     theData.value2 = 0;
     theData.value3 = 0;
     theData.value4 = 0;
+    #ifdef DEBUG_MIN
     Serial.print(" ..Node = ");
     Serial.print(theData.node);
     Serial.print(", Tran = ");
     Serial.println(theData.tran);
+    #endif
   } else {
     theData.node = theNodeID;
     theData.tran = 3;
@@ -510,17 +522,21 @@ void loop() {
     theData.value2 = 0;
     theData.value3 = 0;
     theData.value4 = 0;
+    #ifdef DEBUG_MIN
     Serial.print(" ..Node = ");
     Serial.print(theData.node);
     Serial.print(", Tran = ");
     Serial.println(theData.tran);
+    #endif
   }   
    
   if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData)), 1) { // node must be a byte
     Serial.println("OK ... temp reset message sent ok");
     tResetRequested[nID] = 0;
     } else {
+      #ifdef DEBUG_MIN
       Serial.println("Fail ... temp reset message NOT sent");
+      #endif
       //tResetRequested[theNodeID - 1] = 1;
       tResetRequested[nID] = 1;
     }
@@ -639,38 +655,21 @@ bool readSW(int SW) {
 
 
 int rndUpDn(int in1, int integerDecPlaces, int roundedDecPlaces) {
-  // assumes 2 decimal places
-  //Serial.println("\n------");
   int divFactor = integerDecPlaces/roundedDecPlaces;
-  //Serial.print("divFactor = ");
-  //Serial.println(divFactor);
   int roundingFactor = divFactor/10;
   if (divFactor == 1) roundingFactor = 0;
-  //Serial.print("roundingFactor = ");
-  //Serial.println(roundingFactor);
   
   if (in1 != 9999) {
     int round1 = in1 / divFactor;
-    //Serial.print("round1 = ");
-    //Serial.println(round1);
     int round2;
     int round3;
     if (in1 < 0) {
       round2 = (in1 - (5 * roundingFactor)) / divFactor;
-      //Serial.print("round2 = ");
-      //Serial.println(round2);
       round3 = (in1 / divFactor) - 1;
-      //Serial.print("round3 = ");
-      //Serial.println(round3);
     } else {
       round2 = (in1 + (5 * roundingFactor)) / divFactor;
-      //Serial.print("round2 = ");
-      //Serial.println(round2);
       round3 = (in1 / divFactor) + 1;    
-      //Serial.print("round3 = ");
-      //Serial.println(round3);
     }
-     //Serial.println("------\n"); 
     if (round1 == round2) {
       #ifdef DEBUG_ON
       Serial.print("Result = ");
