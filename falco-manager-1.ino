@@ -23,7 +23,7 @@ PRODUCT_ID(162);
 //#define DEBUG_MIN
 
 #define sDesc "Falco Manager"
-#define sVersion "v0.5.2"
+#define sVersion "v0.5.3"
 #define hVersion "v0.5.0"
 #define tStars "***************************"
 
@@ -68,7 +68,7 @@ typedef struct {
   int16_t           value1; // Current temperature in dec * 100
   int16_t           value2; // Minimum temperature in dec * 100
   int16_t           value3; // Maximum temperature in dec * 100
-  int16_t           value4;
+  int16_t           value4; 
 } Payload;
 Payload theData;
 
@@ -193,13 +193,36 @@ void setup() {
   #endif
   
   String valueSU;
-  valueSU = "te|0|1|3|Startup at " + String(Time.timeStr()) + "|0|0";
-     
+ 
   Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-  Wire.write(valueSU);
-  delay(100);  // try to fix i2c issue
+  Wire.write("te|0|1|3|Startup completed|0|0");
+  //delay(100);  // try to fix i2c issue
   Wire.endTransmission(true);    // stop transmitting
-  delay(100);  // try to fix i2c issue
+  delay(1000);
+  
+  Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+  Wire.write("te|0|0|0|" + String(sDesc) + "|0|0");
+  //delay(100);  // try to fix i2c issue
+  Wire.endTransmission(true);    // stop transmitting
+  delay(1000);
+  
+  Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+  Wire.write("te|0|0|0|SW: " + String(sVersion) + "|0|0");
+  //delay(100);  // try to fix i2c issue
+  Wire.endTransmission(true);    // stop transmitting
+  delay(1000);
+  
+  Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+  Wire.write("te|0|0|0|HW: " + String(hVersion) + "|0|0");
+  //delay(100);  // try to fix i2c issue
+  Wire.endTransmission(true);    // stop transmitting
+  delay(1000);  // try to fix i2c issue
+  
+  Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+  Wire.write("te|0|0|0|  |0|0");
+  //delay(100);  // try to fix i2c issue
+  Wire.endTransmission(true);    // stop transmitting
+  delay(1000);  // try to fix i2c issue
   
 
   mem1 = System.freeMemory();
@@ -259,7 +282,8 @@ void loop() {
       if ((lastData[i] != 0) && (lastDataCheck - lastData[i] > MINUTES_2) && (nodeDataMissing[i] == 0))
       {
         nodeDataMissing[i] = 1;
-        String wireMD = "md|" + String(i) + "|0|0|0|0|0";
+        int nv = i + 1;
+        String wireMD = "md|" + String(nv) + "|0|0|0|0|0";
         //[tran|node|batt|value1|value2|value3|tFlag]
         Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
         Wire.write(wireMD);
