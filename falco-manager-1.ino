@@ -128,6 +128,7 @@ void setup() {
     Particle.process();
   } 
   
+  delay(5000);
   Serial.begin(SERIAL_BAUD);
 
   // was in functio
@@ -150,9 +151,9 @@ void setup() {
   button1.longClickTime  = 1000; // time until "held-down clicks" register
   */
   
-  delay(2000);
+  delay(50);
   digitalWrite(LED, LOW);
-  delay(2000);
+  delay(50);
 
   #ifdef DEBUG_MIN
   Time.zone(0);
@@ -233,37 +234,31 @@ void setup() {
   Serial.println(wifiOff);
   #endif
   
-  String valueSU;
+  //String valueSU;
  
-  Wire.beginTransmission(OTHER_ADDRESS);
-  Wire.write("te|0|1|3|Startup completed|0|1");
-  //delay(100);  // try to fix i2c issue
-  Wire.endTransmission(true);    // stop transmitting
-  delay(1000);
-  
   Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
   Wire.write("te|0|0|0|" + String(sDesc) + "|0|1");
   //delay(100);  // try to fix i2c issue
   Wire.endTransmission(true);    // stop transmitting
-  delay(1000);
+  delay(500);
   
   Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
   Wire.write("te|0|0|0|SW: " + String(sVersion) + "|0|1");
   //delay(100);  // try to fix i2c issue
   Wire.endTransmission(true);    // stop transmitting
-  delay(1000);
+  delay(500);
   
   Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
   Wire.write("te|0|0|0|HW: " + String(hVersion) + "|0|1");
   //delay(100);  // try to fix i2c issue
   Wire.endTransmission(true);    // stop transmitting
-  delay(1000);  // try to fix i2c issue
+  delay(500);  // try to fix i2c issue
   
   Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
   Wire.write("te|0|0|0|Press button|0|1");
   //delay(100);  // try to fix i2c issue
   Wire.endTransmission(true);
-  delay(1000);  // try to fix i2c issue
+  delay(500);  // try to fix i2c issue
 
   //checkButton();
   if (readSW(SW1) == 1)
@@ -272,7 +267,7 @@ void setup() {
     Wire.write("te|0|0|0|Button pressed|0|1");
     //delay(100);  // try to fix i2c issue
     Wire.endTransmission(true);
-    //delay(2000);  // try to fix i2c issue
+    delay(500);  // try to fix i2c issue
   }
   
   mem1 = System.freeMemory();
@@ -292,13 +287,16 @@ void setup() {
     #endif
   }
   
+  Wire.beginTransmission(OTHER_ADDRESS);
+  Wire.write("te|0|0|0|Startup completed|0|0");
+  //delay(100);  // try to fix i2c issue
+  Wire.endTransmission(true);
+    
   #ifdef DEBUG_MIN 
   Serial.println(""); 
   Serial.println("Startup completed ... "); 
   Serial.println(tStars);
   #endif
-  
-  delay (10000);
  
 }
 // End setup
