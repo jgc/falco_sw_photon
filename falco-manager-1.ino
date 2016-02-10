@@ -28,7 +28,7 @@ PRODUCT_ID(162);
 //#define DEBUG_MIN
 
 #define sDesc "Falco Manager"
-#define sVersion "v0.5.4"
+#define sVersion "v0.5.5"
 #define hVersion "v0.5.0"
 #define tStars "***************************"
 
@@ -64,6 +64,7 @@ byte ackCount=0;
 
 byte SW1Counter = 0;
 byte SW1State = 0;
+
 //byte resetTemp = 0;
 
 typedef struct {
@@ -110,14 +111,13 @@ uint8_t numNodes = 9;
 #define MINUTES_5 (5 * 60 * 1000)
 unsigned long lastDataCheck = millis();
 
-/*
 // the Button
 const int buttonPin1 = 4;
-ClickButton button1(buttonPin1, LOW, CLICKBTN_PULLUP);
-// Button results 
-uint8_t function = 0; // was int
-*/
-  
+ClickButton button1(buttonPin1, HIGH, CLICKBTN_PULLUP);
+int8_t function = 0; // was int
+
+
+
 //**** START SETUP ****
 //**** START SETUP ****
 //**** START SETUP ****
@@ -141,15 +141,13 @@ void setup() {
   digitalWrite(LED, HIGH);
   
   pinMode(SW1, INPUT_PULLDOWN);
- 
-  /*
+  //pinMode(D4, INPUT_PULLDOWN); 
   //pinMode(D4, INPUT_PULLUP);
   // Setup button timers (all in milliseconds / ms)
   // (These are default if not set, but changeable for convenience)
   button1.debounceTime   = 20;   // Debounce timer in ms
   button1.multiclickTime = 250;  // Time limit for multi clicks
   button1.longClickTime  = 1000; // time until "held-down clicks" register
-  */
   
   delay(50);
   digitalWrite(LED, LOW);
@@ -260,21 +258,18 @@ void setup() {
   Wire.endTransmission(true);
   delay(500);  // try to fix i2c issue
 
-  //checkButton();
-  if (readSW(SW1) == 1)
+  button1.Update();
+  if (button1.clicks != 0) function = button1.clicks;
+  //delay(5); //? needed
+
+  if (function != 0)
   {
     Wire.beginTransmission(OTHER_ADDRESS);
     Wire.write("te|0|0|0|Button pressed|0|1");
     //delay(100);  // try to fix i2c issue
     Wire.endTransmission(true);
-    delay(500);  // try to fix i2c issue
+    //delay(500);  // try to fix i2c issue
   }
-  
-  mem1 = System.freeMemory();
-  #ifdef DEBUG_MIN  
-  Serial.print("Free memory:"); 
-  Serial.println(mem1);
-  #endif
   
   //Mark all nodes as present - FUTURE allow for only specified devices to be added
   for (int i = 0; i < numNodes; i++) {
@@ -292,6 +287,12 @@ void setup() {
   //delay(100);  // try to fix i2c issue
   Wire.endTransmission(true);
     
+  mem1 = System.freeMemory();
+  #ifdef DEBUG_MIN  
+  Serial.print("Free memory:"); 
+  Serial.println(mem1);
+  #endif
+  
   #ifdef DEBUG_MIN 
   Serial.println(""); 
   Serial.println("Startup completed ... "); 
@@ -344,21 +345,32 @@ void loop() {
     }
   }
   
-  
-  SW1State = readSW(SW1);
-  switchCount();
+  // **** FUTURE **** Add web based reset on a per node basis
+  button1.Update();
+  if (button1.clicks != 0) function = button1.clicks;
+  //delay(5); //? needed
 
-  if (SW1Counter >= 1){
+  if (function < 0)
+  {
+    Serial.print("Button = ");
+    Serial.println(function);
+    function = 0;
+  }      
     
+  if (function > 0)
+  {
     // **** FUTURE **** Add web based reset on a per node basis
-    
+    #ifdef DEBUG_ON  
+    Serial.print("Button = ");
+    Serial.println(function);
+    #endif
     // Reset all temperatures on the display
     String value3 = "rt|999|0|0|0|0|0";
     Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
     Wire.write(value3);
-    delay(100);  // try to fix i2c issue
-    Wire.endTransmission(true);    // stop transmitting
-    delay(100);  // try to fix i2c issue - does not work 
+    //delay(100);  // try to fix i2c issue
+    Wire.endTransmission(true);
+    //delay(100);  // try to fix i2c issue - does not work 
 
     #ifdef DEBUG_ON  
     Serial.print(Time.timeStr());
@@ -381,8 +393,8 @@ void loop() {
       }
     }
     
-    SW1Counter = 0;
-
+    //SW1Counter = 0;
+    function = 0;
   }
       
       
@@ -600,7 +612,9 @@ void loop() {
   }   
    
   if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData)), 1) { // node must be a byte
+    #ifdef DEBUG_MIN
     Serial.println("OK ... temp reset message sent ok");
+    #endif
     tResetRequested[nID] = 0;
     } else {
       #ifdef DEBUG_MIN
@@ -794,30 +808,3 @@ void connect() {
     Particle.connect();
   }
 }
-
-
-/*
-void checkButton()
-{
-  // Update button state
-  button1.Update();
-
-  // Save click codes in LEDfunction, as click codes are reset at next Update()
-  if (button1.clicks != 0) function = button1.clicks;
-  
-  if(button1.clicks == 1) Serial.println("SINGLE click");
-
-  if(function == 2) Serial.println("DOUBLE click");
-
-  if(function == 3) Serial.println("TRIPLE click");
-
-  if(function == -1) Serial.println("SINGLE LONG click");
-
-  if(function == -2) Serial.println("DOUBLE LONG click");
-
-  if(function == -3) Serial.println("TRIPLE LONG click");
-  SW1State = function;
-  function = 0;
-  delay(5);
-}
-*/
