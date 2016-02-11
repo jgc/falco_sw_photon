@@ -346,6 +346,11 @@ void loop() {
     initializeRadio(NETWORKID, EK);
     registerNode = 0;
     clearAddNode = 0;
+    Serial.println("Node add failed ...");
+    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+    Wire.write("te|0|0|0|Node add FAILED|0|1");
+    Wire.endTransmission(true);
+    delay(1000);
     Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
     Wire.write("te|0|0|0|Node add FAILED|0|0");
     Wire.endTransmission(true);
@@ -373,11 +378,11 @@ void loop() {
     
     function = 0;
     delayStartTime = millis();
-    delayMS = 10000;
+    delayMS = 4000;
     while ((millis() - delayStartTime < delayMS))
     {
       button1.Update();
-      Serial.print(".");
+      //Serial.print(".");
       if (button1.clicks != 0) function = button1.clicks;
  
       if (function != 0) 
@@ -390,8 +395,9 @@ void loop() {
         
         function = 0;
         registerNode = 1;  
+        clearAddNode = 1;
         Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-        Wire.write("te|0|0|0|Waiting for new node|0|1");
+        Wire.write("te|0|0|0|Waiting ...|0|1");
         Wire.endTransmission(true);
         
         //#ifdef DEBUG_ON  
@@ -407,7 +413,16 @@ void loop() {
       if (registerNode == 1) break;
     }
     function = 0;
-    Serial.println("\nEnd while  ...");
+    /*
+    Serial.println("\nNode add failed  ...");
+    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+    Wire.write("te|0|0|0|Node add failed|0|1");
+    Wire.endTransmission(true);
+    delay(1000);
+    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+    Wire.write("te|0|0|0|Node add failed|0|0");
+    Wire.endTransmission(true);
+    */
   }
   
   // Reset all temperatures on the display
@@ -611,13 +626,13 @@ void loop() {
   if (radio.ACK_REQUESTED)
   {
     radio.sendACK();
-    #ifdef DEBUG_MIN
+    //#ifdef DEBUG_MIN
     Serial.println(" - ACK sent.");
-    #endif
+    //#endif
   } else {
-    #ifdef DEBUG_MIN
+    //#ifdef DEBUG_MIN
     Serial.println(" - NO ACK sent.");
-    #endif
+    //#endif
   }
   
   #ifdef DEBUG_MIN
@@ -704,17 +719,17 @@ void loop() {
   
   if (sendRF == 1)
   {
-    if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData)), 1)
-    { // node must be a byte
+    if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData)), 1) // node must be a byte
+    { 
       //#ifdef DEBUG_MIN
-      Serial.println("OK ... " + n1 + " message received by Node " + theNodeID + " [Tran=" + theData.tran + "]");
+      Serial.println(Time.timeStr() + ": OK ... " + n1 + " message sent to and received by Node " + theNodeID + " [Tran=" + theData.tran + "]");
       //#endif
       if (registerNode == 0) tResetRequested[nID] = 0;
     } 
     else 
     {
       //#ifdef DEBUG_MIN
-      Serial.println("Fail ... " + n1 + " message NOT received by Node " + theNodeID + " [Tran=" + theData.tran + "]");
+      Serial.println(Time.timeStr() + ": Fail ... " + n1 + " message NOT sent to and received by Node " + theNodeID + " [Tran=" + theData.tran + "]");
       //#endif
       //tResetRequested[theNodeID - 1] = 1;
       if (registerNode == 0) tResetRequested[nID] = 1;
@@ -730,7 +745,6 @@ void loop() {
     }
     #endif
 
-    clearAddNode = 0;
     sendRF = 0;
     
   }    
@@ -757,9 +771,14 @@ void loop() {
 
   } // END receiveDone()
 }
-// **** END LOOPP ****
+// **** END LOOP ****
+// **** END LOOP ****
+// **** END LOOP ****
 
 
+// **** START FUNCTIONS ****
+// **** START FUNCTIONS ****
+// **** START FUNCTIONS ****
 
 void Blink(byte PIN, int DELAY_MS)
 {
