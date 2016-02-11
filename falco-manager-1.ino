@@ -106,6 +106,7 @@ IPAddress remoteIP(181,224,135,60);
 int numberOfReceivedPackage = 0;
 
 bool registerNode = 0;   
+bool clearAddNode = 0;
 boolean nodePresent[9];
 unsigned long lastData[9];
 boolean nodeDataMissing[9];
@@ -339,11 +340,15 @@ void loop() {
     }
   }
   
-  if ((registerNode == 1) && (millis() - delayStartTime > (2*delayMS)))
+  if ((clearAddNode == 1) && (millis() - delayStartTime > (2*delayMS)))
   {
     EK = ENCRYPTKEY; 
     initializeRadio(NETWORKID, EK);
     registerNode = 0;
+    clearAddNode = 0;
+    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+    Wire.write("te|0|0|0|Node add FAILED|0|0");
+    Wire.endTransmission(true);
   }
   
   button1.Update();
@@ -364,10 +369,11 @@ void loop() {
     Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
     Wire.write("te|0|0|0|Click to add node|0|1");
     Wire.endTransmission(true);
-
+    clearAddNode = 1;
+    
     function = 0;
     delayStartTime = millis();
-    delayMS = 6000;
+    delayMS = 10000;
     while ((millis() - delayStartTime < delayMS))
     {
       button1.Update();
@@ -609,9 +615,9 @@ void loop() {
     Serial.println(" - ACK sent.");
     #endif
   } else {
-    //#ifdef DEBUG_MIN
+    #ifdef DEBUG_MIN
     Serial.println(" - NO ACK sent.");
-    //#endif
+    #endif
   }
   
   #ifdef DEBUG_MIN
@@ -619,10 +625,10 @@ void loop() {
   Serial.println(tResetRequested[theNodeID - 1]);
   #endif
   
-  //#ifdef DEBUG_MIN
+  #ifdef DEBUG_MIN
   Serial.print("theNodeID = ");
   Serial.println(theNodeID);
-  //#endif
+  #endif
   
   int nID = 0;
   nID = theNodeID - 1;
@@ -640,12 +646,12 @@ void loop() {
     theData.value2 = 0;
     theData.value3 = 0;
     theData.value4 = 0;
-    //#ifdef DEBUG_MIN
+    #ifdef DEBUG_MIN
     Serial.print(" ..Node = ");
     Serial.print(theData.node);
     Serial.print(", Tran = ");
     Serial.println(theData.tran);
-    //#endif
+    #endif
   }
   
   if (tResetRequested[nID] == 0)
@@ -659,12 +665,12 @@ void loop() {
     theData.value2 = 0;
     theData.value3 = 0;
     theData.value4 = 0;
-    //#ifdef DEBUG_MIN
+    #ifdef DEBUG_MIN
     Serial.print(" ..Node = ");
     Serial.print(theData.node);
     Serial.print(", Tran = ");
     Serial.println(theData.tran);
-    //#endif
+    #endif
   }   
   
   if (registerNode == 1)
@@ -679,13 +685,22 @@ void loop() {
     theData.value2 = ENCRYPTKEYb;
     theData.value3 = ENCRYPTKEYc;
     theData.value4 = ENCRYPTKEYd;
-    //#ifdef DEBUG_MIN
+    #ifdef DEBUG_MIN
     Serial.print(" ..Node = ");
     Serial.print(theData.node);
     Serial.print(", Tran = ");
     Serial.println(theData.tran);
-    //#endif
+    #endif
   }
+  
+  //#ifdef DEBUG_MIN
+  Serial.print("theNodeID = ");
+  Serial.print(theNodeID);
+  Serial.print(", Node = ");
+  Serial.print(theData.node);
+  Serial.print(", Tran = ");
+  Serial.println(theData.tran);
+  //#endif
   
   if (sendRF == 1)
   {
@@ -715,14 +730,9 @@ void loop() {
     }
     #endif
 
-    if (registerNode == 1)
-    {
-      EK = ENCRYPTKEY;
-      initializeRadio(NETWORKID, EK);
-      registerNode = 0;
-    }
-    
+    clearAddNode = 0;
     sendRF = 0;
+    
   }    
 
     
