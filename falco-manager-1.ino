@@ -693,28 +693,28 @@ void loop() {
     #endif
   }
   
-  //#ifdef DEBUG_MIN
+  #ifdef DEBUG_MIN
   Serial.print("theNodeID = ");
   Serial.print(theNodeID);
   Serial.print(", Node = ");
   Serial.print(theData.node);
   Serial.print(", Tran = ");
   Serial.println(theData.tran);
-  //#endif
+  #endif
   
   if (sendRF == 1)
   {
     if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData)), 1)
     { // node must be a byte
       //#ifdef DEBUG_MIN
-      Serial.println("OK ... " + n1 + " message received [Tran=" + theData.tran + "]");
+      Serial.println("OK ... " + n1 + " message received by Node " + theNodeID + " [Tran=" + theData.tran + "]");
       //#endif
       if (registerNode == 0) tResetRequested[nID] = 0;
     } 
     else 
     {
       //#ifdef DEBUG_MIN
-      Serial.println("Fail ... " + n1 + " message NOT received [Tran=" + theData.tran + "]");
+      Serial.println("Fail ... " + n1 + " message NOT received by Node " + theNodeID + " [Tran=" + theData.tran + "]");
       //#endif
       //tResetRequested[theNodeID - 1] = 1;
       if (registerNode == 0) tResetRequested[nID] = 1;
@@ -735,7 +735,6 @@ void loop() {
     
   }    
 
-    
   #ifdef DEBUG_ON          
   for (int i = 0; i < numNodes; i++) 
   {
@@ -745,7 +744,6 @@ void loop() {
     Serial.println(lastData[i]);
   }
   #endif
-   
    
   #ifdef DEBUG_MIN  
   mem1 = System.freeMemory();
