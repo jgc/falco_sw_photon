@@ -28,7 +28,7 @@ PRODUCT_ID(162);
 //#define DEBUG_MIN
 
 #define sDesc "Falco Manager"
-#define sVersion "v0.5.5"
+#define sVersion "v0.5.6"
 #define hVersion "v0.5.0"
 #define tStars "***************************"
 
@@ -40,10 +40,15 @@ unsigned int lastPublish = 0;
 
 #define NODEID          31   
 #define NETWORKID       100  
+#define NETWORKIDa      1
 #define FREQUENCY       RF69_868MHZ
 //#define FREQUENCY     RF69_868MHZ
 //#define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY      "sampleEncryptKey" 
+#define ENCRYPTKEYa     32767
+#define ENCRYPTKEYb     -32767
+#define ENCRYPTKEYc     32767
+#define ENCRYPTKEYd     -32767
 #define IS_RFM69HW      //uncomment only for RFM69HW! Leave out if you have RFM69W!
 #define ACK_TIME        450 // max # of ms to wait for an ack default 30
 #define SERIAL_BAUD     9600 // 57600
@@ -52,6 +57,7 @@ unsigned int lastPublish = 0;
 #define LED             D7 
 #define ledPin          D7 //FIX
 
+String EK = ""; 
 uint8_t theNodeID = 99; 
   
 int ledState = HIGH; 
@@ -99,6 +105,7 @@ int cloudReset(String command);
 IPAddress remoteIP(181,224,135,60);
 int numberOfReceivedPackage = 0;
 
+bool registerNode = 0;   
 boolean nodePresent[9];
 unsigned long lastData[9];
 boolean nodeDataMissing[9];
@@ -111,11 +118,15 @@ uint8_t numNodes = 9;
 #define MINUTES_5 (5 * 60 * 1000)
 unsigned long lastDataCheck = millis();
 
+// (millis() - delayStartTime > delayMS)
+unsigned long delayStartTime = 0;
+unsigned long delayMS = 0;
+
 // the Button
 const int buttonPin1 = 4;
 ClickButton button1(buttonPin1, HIGH, CLICKBTN_PULLUP);
 int8_t function = 0; // was int
-
+int button1State = 0;
 
 
 //**** START SETUP ****
@@ -164,14 +175,13 @@ void setup() {
   //#ifdef DEBUG_MIN      
   Serial.println("");
   Serial.println("");
-  Serial.println(tStars);
   Serial.print("Decription: ");
   Serial.println(sDesc);
   Serial.print("Software version: ");
   Serial.println(sVersion);
   Serial.print("Hardware version: ");
   Serial.println(hVersion);
-  Serial.println("");
+  Serial.println(tStars);
   //#endif
   
   Particle.function("resetWifi", cloudResetWifi);
@@ -179,8 +189,8 @@ void setup() {
   Particle.variable("sVersion", sVersion, STRING);
   Particle.variable("hVersion", hVersion, STRING);
   Particle.variable("sDesc", sDesc, STRING);
-  //Particle.variable("SW1State", &SW1State, INT);
-  //Particle.variable("SW1Counter", &SW1Counter, INT);
+  
+  Particle.variable("button1State", &button1State, INT);
   Particle.variable("reboots", &reboots, INT);
   Particle.variable("wifiOff", &wifiOff, INT);
   
@@ -196,15 +206,19 @@ void setup() {
   //Serial.begin(SERIAL_BAUD);
   //delay(10);
  
+  EK = ENCRYPTKEY; 
+  //String EK = String(ENCRYPTKEYa) + String(ENCRYPTKEYb) + String(ENCRYPTKEYc) + String(ENCRYPTKEYd); 
+  initializeRadio(NETWORKID, EK);
+  /*
   radio.initialize(FREQUENCY,NODEID,NETWORKID);
-#ifdef IS_RFM69HW
+  #ifdef IS_RFM69HW
   radio.setHighPower(); //uncomment only for RFM69HW!
   int highPower = 1;
-#endif
+  #endif
   radio.encrypt(ENCRYPTKEY);
   radio.promiscuous(promiscuousMode);
 
-#ifdef DEBUG_ON
+  #ifdef DEBUG_ON
   char buff[50];
   sprintf(buff, "\nListening at %d Mhz...", FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
   Serial.println(buff);
@@ -212,7 +226,9 @@ void setup() {
   Serial.println(promiscuousMode);
   Serial.print("Power level = ");
   Serial.println(highPower);
-#endif
+  #endif
+  */
+
 
   randomSeed(newSeed);
   
@@ -236,42 +252,24 @@ void setup() {
  
   Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
   Wire.write("te|0|0|0|" + String(sDesc) + "|0|1");
-  //delay(100);  // try to fix i2c issue
   Wire.endTransmission(true);    // stop transmitting
   delay(500);
   
   Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
   Wire.write("te|0|0|0|SW: " + String(sVersion) + "|0|1");
-  //delay(100);  // try to fix i2c issue
   Wire.endTransmission(true);    // stop transmitting
   delay(500);
   
   Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
   Wire.write("te|0|0|0|HW: " + String(hVersion) + "|0|1");
-  //delay(100);  // try to fix i2c issue
   Wire.endTransmission(true);    // stop transmitting
   delay(500);  // try to fix i2c issue
   
-  Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-  Wire.write("te|0|0|0|Press button|0|1");
-  //delay(100);  // try to fix i2c issue
+  Wire.beginTransmission(OTHER_ADDRESS);
+  Wire.write("te|0|0|0|Startup completed|0|0");
   Wire.endTransmission(true);
-  delay(500);  // try to fix i2c issue
-
-  button1.Update();
-  if (button1.clicks != 0) function = button1.clicks;
-  //delay(5); //? needed
-
-  if (function != 0)
-  {
-    Wire.beginTransmission(OTHER_ADDRESS);
-    Wire.write("te|0|0|0|Button pressed|0|1");
-    //delay(100);  // try to fix i2c issue
-    Wire.endTransmission(true);
-    //delay(500);  // try to fix i2c issue
-  }
-  
-  //Mark all nodes as present - FUTURE allow for only specified devices to be added
+ 
+ //Mark all nodes as present - FUTURE allow for only specified devices to be added
   for (int i = 0; i < numNodes; i++) {
     nodePresent[i] = 1;
     #ifdef DEBUG_ON          
@@ -281,12 +279,7 @@ void setup() {
     Serial.println(nodePresent[i]);
     #endif
   }
-  
-  Wire.beginTransmission(OTHER_ADDRESS);
-  Wire.write("te|0|0|0|Startup completed|0|0");
-  //delay(100);  // try to fix i2c issue
-  Wire.endTransmission(true);
-    
+
   mem1 = System.freeMemory();
   #ifdef DEBUG_MIN  
   Serial.print("Free memory:"); 
@@ -317,7 +310,8 @@ void loop() {
   }  
   
   
-  if (millis() - lastDataCheck > MINUTES_2) { //ADD FIX for millis turning over to 0 
+  if (millis() - lastDataCheck > MINUTES_2) 
+  { //ADD FIX for millis turning over to 0 
     lastDataCheck = millis();
     #ifdef DEBUG_ON
     Serial.println("millis() check ...");
@@ -345,33 +339,87 @@ void loop() {
     }
   }
   
-  // **** FUTURE **** Add web based reset on a per node basis
+  if ((registerNode == 1) && (millis() - delayStartTime > (2*delayMS)))
+  {
+    EK = ENCRYPTKEY; 
+    initializeRadio(NETWORKID, EK);
+    registerNode = 0;
+  }
+  
   button1.Update();
   if (button1.clicks != 0) function = button1.clicks;
-  //delay(5); //? needed
 
+  // **** FUTURE **** Add web based reset with ability to specify node
+  //if (button1State != 0) function = button1State;
+    
+  // Add new node
   if (function < 0)
   {
-    Serial.print("Button = ");
+    //#ifdef DEBUG_ON  
+    Serial.print("Button 1 = ");
     Serial.println(function);
     function = 0;
-  }      
+    //#endif
     
+    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+    Wire.write("te|0|0|0|Click to add node|0|1");
+    Wire.endTransmission(true);
+
+    function = 0;
+    delayStartTime = millis();
+    delayMS = 6000;
+    while ((millis() - delayStartTime < delayMS))
+    {
+      button1.Update();
+      Serial.print(".");
+      if (button1.clicks != 0) function = button1.clicks;
+ 
+      if (function != 0) 
+      {
+        //#ifdef DEBUG_ON  
+        Serial.print("\nButton 2 = ");
+        Serial.println(function);
+        function = 0;
+        //#endif
+        
+        function = 0;
+        registerNode = 1;  
+        Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+        Wire.write("te|0|0|0|Waiting for new node|0|1");
+        Wire.endTransmission(true);
+        
+        //#ifdef DEBUG_ON  
+        Serial.println("Waiting  ...");
+        function = 0;
+        //#endif
+        
+        String EK = String(ENCRYPTKEYa) + String(ENCRYPTKEYb) + String(ENCRYPTKEYc) + String(ENCRYPTKEYd); 
+        initializeRadio(NETWORKID, EK);
+      }
+      delay(5);
+      
+      if (registerNode == 1) break;
+    }
+    function = 0;
+    Serial.println("\nEnd while  ...");
+  }
+  
+  // Reset all temperatures on the display
   if (function > 0)
   {
-    // **** FUTURE **** Add web based reset on a per node basis
+    //SW1Counter = 0;
+    function = 0;
+    
     #ifdef DEBUG_ON  
     Serial.print("Button = ");
     Serial.println(function);
     #endif
-    // Reset all temperatures on the display
+    
     String value3 = "rt|999|0|0|0|0|0";
     Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
     Wire.write(value3);
-    //delay(100);  // try to fix i2c issue
     Wire.endTransmission(true);
-    //delay(100);  // try to fix i2c issue - does not work 
-
+    
     #ifdef DEBUG_ON  
     Serial.print(Time.timeStr());
     Serial.print(" [");
@@ -392,15 +440,12 @@ void loop() {
         #endif
       }
     }
-    
-    //SW1Counter = 0;
-    function = 0;
   }
       
       
   if (radio.receiveDone())
   {
-#ifdef DEBUG_MIN 
+    #ifdef DEBUG_MIN 
     Serial.println("");
     Serial.print("At ");
     Serial.println(Time.timeStr());
@@ -410,7 +455,7 @@ void loop() {
     Serial.print(" [RX_RSSI:");
     Serial.print(radio.readRSSI());
     Serial.print("]");
-#endif
+    #endif
     if (promiscuousMode)
     {
       #ifdef DEBUG_ON
@@ -487,38 +532,39 @@ void loop() {
     Serial.println("]");
     #endif
       
-      if (tResetCompleted[theNodeID - 1] == 1) {
-        tMin = temp1;
-        tMax = temp1;
-        tResetCompleted[theNodeID - 1] = 0;
-        #ifdef DEBUG_MIN
-        Serial.print(temp1);
-        Serial.print("|");
-        Serial.print(tMin);
-        Serial.print("|");
-        Serial.print(tMax);
-        Serial.print("|");
-        #endif
-      }
-      
-      Serial.println();
-      
-      // displayThermometer(int layout, int tval, int tmin, int tmax, int tx, int ty, int flag)
-      String value1 = "{ \"node\": \"" + String(theData.node) + "\", \"volts\": \"" + String(batt2) + "\", \"temp1\": \"" + String(temp2) + "\", \"sVersion\": \"" + String(SW1Counter) + "\"  }";
-      String value2 = "dt|" + String(theNodeID) + "|" + String(batt1) + "|" + String(temp1) + "|" + String(tMin) + "|" + String(tMax)  + "|" + String(tFlag);
-      
+    if (tResetCompleted[theNodeID - 1] == 1) 
+    {
+      tMin = temp1;
+      tMax = temp1;
+      tResetCompleted[theNodeID - 1] = 0;
       #ifdef DEBUG_MIN
-      Serial.println("Pinging started...");
+      Serial.print(temp1);
+      Serial.print("|");
+      Serial.print(tMin);
+      Serial.print("|");
+      Serial.print(tMax);
+      Serial.print("|");
       #endif
-      numberOfReceivedPackage = 0;
-      numberOfReceivedPackage = WiFi.ping(remoteIP);
-      #ifdef DEBUG_MIN
-      Serial.println("Pinging ended ->");
-      Serial.println(numberOfReceivedPackage);
-      #endif
+    }
       
-      bool success;
-      success = Particle.publish("temperature1", value1, 60, PRIVATE);
+    Serial.println();
+      
+    // displayThermometer(int layout, int tval, int tmin, int tmax, int tx, int ty, int flag)
+    String value1 = "{ \"node\": \"" + String(theData.node) + "\", \"volts\": \"" + String(batt2) + "\", \"temp1\": \"" + String(temp2) + "\", \"sVersion\": \"" + String(SW1Counter) + "\"  }";
+    String value2 = "dt|" + String(theNodeID) + "|" + String(batt1) + "|" + String(temp1) + "|" + String(tMin) + "|" + String(tMax)  + "|" + String(tFlag);
+      
+    #ifdef DEBUG_MIN
+    Serial.println("Pinging started...");
+    #endif
+    numberOfReceivedPackage = 0;
+    numberOfReceivedPackage = WiFi.ping(remoteIP);
+    #ifdef DEBUG_MIN
+    Serial.println("Pinging ended ->");
+    Serial.println(numberOfReceivedPackage);
+    #endif
+      
+    bool success;
+    success = Particle.publish("temperature1", value1, 60, PRIVATE);
       
       #ifdef DEBUG_MIN  
       if (success) {
@@ -557,31 +603,36 @@ void loop() {
   theNodeID = radio.SENDERID;
 
   if (radio.ACK_REQUESTED)
-   {
-        radio.sendACK();
-        #ifdef DEBUG_MIN
-        Serial.println(" - ACK sent.");
-        #endif
-    } else {
-        #ifdef DEBUG_MIN
-        Serial.println(" - NO ACK sent.");
-        #endif
-    }
+  {
+    radio.sendACK();
+    #ifdef DEBUG_MIN
+    Serial.println(" - ACK sent.");
+    #endif
+  } else {
+    //#ifdef DEBUG_MIN
+    Serial.println(" - NO ACK sent.");
+    //#endif
+  }
   
   #ifdef DEBUG_MIN
   Serial.print("tResetRequested = ");
   Serial.println(tResetRequested[theNodeID - 1]);
   #endif
   
-  #ifdef DEBUG_MIN
+  //#ifdef DEBUG_MIN
   Serial.print("theNodeID = ");
   Serial.println(theNodeID);
-  #endif
+  //#endif
   
   int nID = 0;
   nID = theNodeID - 1;
-
-  if (tResetRequested[nID] == 1) {
+  String n1 = "";
+  bool sendRF = 0;
+        
+  if (tResetRequested[nID] == 1) 
+  {
+    sendRF = 1;
+    n1 = "temp reset"; 
     theData.node = theNodeID;
     theData.tran = 99;
     theData.batt = 0;
@@ -589,13 +640,18 @@ void loop() {
     theData.value2 = 0;
     theData.value3 = 0;
     theData.value4 = 0;
-    #ifdef DEBUG_MIN
+    //#ifdef DEBUG_MIN
     Serial.print(" ..Node = ");
     Serial.print(theData.node);
     Serial.print(", Tran = ");
     Serial.println(theData.tran);
-    #endif
-  } else {
+    //#endif
+  }
+  
+  if (tResetRequested[nID] == 0)
+  {
+    sendRF = 1;
+    n1 = ""; 
     theData.node = theNodeID;
     theData.tran = 3;
     theData.batt = 0;
@@ -603,40 +659,76 @@ void loop() {
     theData.value2 = 0;
     theData.value3 = 0;
     theData.value4 = 0;
-    #ifdef DEBUG_MIN
+    //#ifdef DEBUG_MIN
     Serial.print(" ..Node = ");
     Serial.print(theData.node);
     Serial.print(", Tran = ");
     Serial.println(theData.tran);
-    #endif
+    //#endif
   }   
-   
-  if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData)), 1) { // node must be a byte
-    #ifdef DEBUG_MIN
-    Serial.println("OK ... temp reset message sent ok");
-    #endif
-    tResetRequested[nID] = 0;
-    } else {
-      #ifdef DEBUG_MIN
-      Serial.println("Fail ... temp reset message NOT sent");
-      #endif
-      //tResetRequested[theNodeID - 1] = 1;
-      tResetRequested[nID] = 1;
-    }
-  //**}
-
-  #ifdef DEBUG_ON          
-  for (int i = 0; i < numNodes; i++) {
-    Serial.print("tResetRequested [node ");
-    Serial.print(i + 1);
-    Serial.print("] = ");
-    Serial.println(tResetRequested[i]);
+  
+  if (registerNode == 1)
+  {
+    sendRF = 1;
+    n1 = "register node"; 
+    theNodeID = 1;
+    theData.node = 1;
+    theData.tran = 90;
+    theData.batt = 0;
+    theData.value1 = ENCRYPTKEYa;
+    theData.value2 = ENCRYPTKEYb;
+    theData.value3 = ENCRYPTKEYc;
+    theData.value4 = ENCRYPTKEYd;
+    //#ifdef DEBUG_MIN
+    Serial.print(" ..Node = ");
+    Serial.print(theData.node);
+    Serial.print(", Tran = ");
+    Serial.println(theData.tran);
+    //#endif
   }
-   #endif
+  
+  if (sendRF == 1)
+  {
+    if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData)), 1)
+    { // node must be a byte
+      //#ifdef DEBUG_MIN
+      Serial.println("OK ... " + n1 + " message received [Tran=" + theData.tran + "]");
+      //#endif
+      if (registerNode == 0) tResetRequested[nID] = 0;
+    } 
+    else 
+    {
+      //#ifdef DEBUG_MIN
+      Serial.println("Fail ... " + n1 + " message NOT received [Tran=" + theData.tran + "]");
+      //#endif
+      //tResetRequested[theNodeID - 1] = 1;
+      if (registerNode == 0) tResetRequested[nID] = 1;
+    }
+
+    #ifdef DEBUG_ON          
+    for (int i = 0; i < numNodes; i++) 
+    {
+      Serial.print("tResetRequested [node ");
+      Serial.print(i + 1);
+      Serial.print("] = ");
+      Serial.println(tResetRequested[i]);
+    }
+    #endif
+
+    if (registerNode == 1)
+    {
+      EK = ENCRYPTKEY;
+      initializeRadio(NETWORKID, EK);
+      registerNode = 0;
+    }
     
+    sendRF = 0;
+  }    
+
     
   #ifdef DEBUG_ON          
-  for (int i = 0; i < numNodes; i++) {
+  for (int i = 0; i < numNodes; i++) 
+  {
     Serial.print("lastData [node ");
     Serial.print(i + 1);
     Serial.print("] = ");
@@ -655,7 +747,7 @@ void loop() {
   Serial.println();
   #endif    
 
-  }
+  } // END receiveDone()
 }
 // **** END LOOPP ****
 
@@ -807,4 +899,28 @@ void connect() {
   if (Particle.connected() == false) {
     Particle.connect();
   }
+}
+
+
+void initializeRadio(uint8_t rfNetworkID, String rfEncryptkey)
+{
+  radio.initialize(FREQUENCY, NODEID, rfNetworkID);
+  #ifdef IS_RFM69HW
+  radio.setHighPower(); //uncomment only for RFM69HW!
+  int highPower = 1;
+  #endif
+  radio.encrypt(rfEncryptkey);
+  radio.promiscuous(promiscuousMode);
+
+  //#ifdef DEBUG_ON
+  char buff[50];
+  sprintf(buff, "\nListening at %d Mhz...", FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
+  Serial.println(buff);
+  Serial.print("Promiscuous mode = ");
+  Serial.println(promiscuousMode);
+  Serial.print("Power level = ");
+  Serial.println(highPower);
+  Serial.print("Encryption key = ");
+  Serial.println(rfEncryptkey);
+  //#endif
 }
