@@ -16,8 +16,8 @@
 #include "RFM69registers.h"
 //#include "clickButton/clickButton.h"
 
-SYSTEM_MODE(SEMI_AUTOMATIC);
 //SYSTEM_MODE(AUTOMATIC);
+SYSTEM_MODE(SEMI_AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 
 PRODUCT_VERSION(2);
@@ -25,7 +25,9 @@ PRODUCT_ID(162);
 
 //#define RANDOMDATA
 //#define DEBUG_ON        //DEBUG is defined so cannot use)
-//#define DEBUG_MIN
+#define DEBUG_MIN
+#define DEBUG_ADDNODE
+
 
 #define sDesc "Falco Manager"
 #define sVersion "v0.5.6"
@@ -40,15 +42,11 @@ unsigned int lastPublish = 0;
 
 #define NODEID          31   
 #define NETWORKID       100  
-#define NETWORKIDa      1
+#define NETWORKID_SU    1
 #define FREQUENCY       RF69_868MHZ
 //#define FREQUENCY     RF69_868MHZ
 //#define FREQUENCY     RF69_915MHZ
-#define ENCRYPTKEY      "sampleEncryptKey" 
-#define ENCRYPTKEYa     32767
-#define ENCRYPTKEYb     -32767
-#define ENCRYPTKEYc     32767
-#define ENCRYPTKEYd     -32767
+#define ENCRYPTKEY      "setup1EncryptKey" 
 #define IS_RFM69HW      //uncomment only for RFM69HW! Leave out if you have RFM69W!
 #define ACK_TIME        450 // max # of ms to wait for an ack default 30
 #define SERIAL_BAUD     9600 // 57600
@@ -57,7 +55,8 @@ unsigned int lastPublish = 0;
 #define LED             D7 
 #define ledPin          D7 //FIX
 
-String EK = ""; 
+String EK_SU = ENCRYPTKEY;
+char EK1[17] = {'s', 'a', 'm', 'p', 'l', 'e', 'E', 'n', 'c', 'r', 'y', 'p', 't', 'K', 'e', 'y', '\0'};
 uint8_t theNodeID = 99; 
   
 int ledState = HIGH; 
@@ -81,6 +80,12 @@ typedef struct {
   int16_t           value2; // Minimum temperature in dec * 100
   int16_t           value3; // Maximum temperature in dec * 100
   int16_t           value4; 
+  #ifdef DEBUG_ADDNODE
+  int16_t           value5; // Maximum temperature in dec * 100
+  int16_t           value6; // Maximum temperature in dec * 100
+  int16_t           value7; // Maximum temperature in dec * 100
+  int16_t           value8; // Maximum temperature in dec * 100
+  #endif
 } Payload;
 Payload theData;
 
@@ -105,9 +110,10 @@ int cloudReset(String command);
 IPAddress remoteIP(181,224,135,60);
 int numberOfReceivedPackage = 0;
 
-bool registerNode = 0;   
+bool registerNode = 0;  //used
 bool clearAddNode = 0;
-boolean nodePresent[9];
+boolean nodePresent[9]; // used
+int UNID = 99;
 unsigned long lastData[9];
 boolean nodeDataMissing[9];
 boolean tResetRequested[9];
@@ -130,6 +136,7 @@ int8_t function = 0; // was int
 int button1State = 0;
 
 
+
 //**** START SETUP ****
 //**** START SETUP ****
 //**** START SETUP ****
@@ -140,7 +147,6 @@ void setup() {
     Particle.process();
   } 
   
-  delay(5000);
   Serial.begin(SERIAL_BAUD);
 
   // was in functio
@@ -170,9 +176,7 @@ void setup() {
   Serial.println(Time.timeStr());
   #endif
   Wire.begin();
-  // end was in functio
-  
-
+ 
   //#ifdef DEBUG_MIN      
   Serial.println("");
   Serial.println("");
@@ -184,9 +188,14 @@ void setup() {
   Serial.println(hVersion);
   Serial.println(tStars);
   //#endif
-  
+  // Currently the application supports the creation of up to 4 different cloud functions
+  // 12 characters long with name
+  // String parameter of 63 characters.
   Particle.function("resetWifi", cloudResetWifi);
   Particle.function("resetReboots", cloudResetReboots);  
+  Particle.function("manageNodes", manageNodes);  
+  
+  
   Particle.variable("sVersion", sVersion, STRING);
   Particle.variable("hVersion", hVersion, STRING);
   Particle.variable("sDesc", sDesc, STRING);
@@ -204,33 +213,8 @@ void setup() {
   Particle.subscribe("hook-response/temperature1", tempResponse, MY_DEVICES);
   pinMode(LED, OUTPUT);
   
-  //Serial.begin(SERIAL_BAUD);
-  //delay(10);
- 
-  EK = ENCRYPTKEY; 
-  //String EK = String(ENCRYPTKEYa) + String(ENCRYPTKEYb) + String(ENCRYPTKEYc) + String(ENCRYPTKEYd); 
-  initializeRadio(NETWORKID, EK);
-  /*
-  radio.initialize(FREQUENCY,NODEID,NETWORKID);
-  #ifdef IS_RFM69HW
-  radio.setHighPower(); //uncomment only for RFM69HW!
-  int highPower = 1;
-  #endif
-  radio.encrypt(ENCRYPTKEY);
-  radio.promiscuous(promiscuousMode);
-
-  #ifdef DEBUG_ON
-  char buff[50];
-  sprintf(buff, "\nListening at %d Mhz...", FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
-  Serial.println(buff);
-  Serial.print("Promiscuous mode = ");
-  Serial.println(promiscuousMode);
-  Serial.print("Power level = ");
-  Serial.println(highPower);
-  #endif
-  */
-
-
+  initializeRadio(NETWORKID, EK1);
+  
   randomSeed(newSeed);
   
   Blink(LED,1000);
@@ -270,26 +254,35 @@ void setup() {
   Wire.write("te|0|0|0|Startup completed|0|0");
   Wire.endTransmission(true);
  
+ 
  //Mark all nodes as present - FUTURE allow for only specified devices to be added
   for (int i = 0; i < numNodes; i++) {
-    nodePresent[i] = 1;
-    #ifdef DEBUG_ON          
+    nodePresent[i] = 0; //FIX ?? breaks reset, see fix below
+    #ifdef DEBUG_MIN       
     Serial.print("nodePresent [node ");
     Serial.print(i + 1);
     Serial.print("] = ");
     Serial.println(nodePresent[i]);
     #endif
   }
-
+ 
+  
+  //FIX for node 4
+  EEPROM.update(103, 1);
+  
+  Serial.println(); 
+  UNID = unusedNodeID();
+  Serial.print("\nUNID = "); 
+  Serial.println(UNID);
+  
   mem1 = System.freeMemory();
   #ifdef DEBUG_MIN  
-  Serial.print("Free memory:"); 
+  Serial.print("\nFree memory:"); 
   Serial.println(mem1);
   #endif
   
   #ifdef DEBUG_MIN 
-  Serial.println(""); 
-  Serial.println("Startup completed ... "); 
+  Serial.println("\nStartup completed ... "); 
   Serial.println(tStars);
   #endif
  
@@ -300,6 +293,9 @@ void setup() {
 
 
 
+// Start loop
+// Start loop
+// Start loop
 void loop() {
 
   if (!Particle.connected() && ((wifiOff % 4) == 0))
@@ -340,10 +336,10 @@ void loop() {
     }
   }
   
-  if ((clearAddNode == 1) && (millis() - delayStartTime > (2*delayMS)))
+  //if ((clearAddNode == 1) && (millis() - delayStartTime > (2*delayMS)))
+  if ((clearAddNode == 1) && (millis() - delayStartTime > delayMS))
   {
-    EK = ENCRYPTKEY; 
-    initializeRadio(NETWORKID, EK);
+    initializeRadio(NETWORKID, EK1);
     registerNode = 0;
     clearAddNode = 0;
     Serial.println("Node add failed ...");
@@ -378,7 +374,8 @@ void loop() {
     
     function = 0;
     delayStartTime = millis();
-    delayMS = 4000;
+    //delayMS = 4000;
+    delayMS = 15000;
     while ((millis() - delayStartTime < delayMS))
     {
       button1.Update();
@@ -405,8 +402,7 @@ void loop() {
         function = 0;
         //#endif
         
-        String EK = String(ENCRYPTKEYa) + String(ENCRYPTKEYb) + String(ENCRYPTKEYc) + String(ENCRYPTKEYd); 
-        initializeRadio(NETWORKID, EK);
+        initializeRadio(NETWORKID_SU, EK_SU);
       }
       delay(5);
       
@@ -449,7 +445,7 @@ void loop() {
     #endif
     
     for (int i = 0; i < numNodes; i++) {
-      if (nodePresent[i] == 1)
+      //if (nodePresent[i] == 1) //FIX *************************
       {
         tResetRequested[i] = 1;
         tResetCompleted[i] = 1;
@@ -505,6 +501,7 @@ void loop() {
     #endif
     
     theNodeID = theData.node;
+    // FIX FIX must check if node is not on network 1
     //lastData[theNodeID - 1] = Time.now();   
     lastData[theNodeID - 1] = millis();  // time may not be reliable if device starts up disconnected from the web   
     nodeDataMissing[theNodeID - 1] = 0; //since data is retrived do not need to send 
@@ -573,7 +570,7 @@ void loop() {
     // displayThermometer(int layout, int tval, int tmin, int tmax, int tx, int ty, int flag)
     String value1 = "{ \"node\": \"" + String(theData.node) + "\", \"volts\": \"" + String(batt2) + "\", \"temp1\": \"" + String(temp2) + "\", \"sVersion\": \"" + String(SW1Counter) + "\"  }";
     String value2 = "dt|" + String(theNodeID) + "|" + String(batt1) + "|" + String(temp1) + "|" + String(tMin) + "|" + String(tMax)  + "|" + String(tFlag);
-      
+    
     #ifdef DEBUG_MIN
     Serial.println("Pinging started...");
     #endif
@@ -608,19 +605,22 @@ void loop() {
       Serial.println(wifiOff);
       #endif
 
+    if (theData.tran == 2)
+    {
       Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
       Wire.write(value2);
       delay(100);  // try to fix i2c issue
       Wire.endTransmission(true);    // stop transmitting
       delay(100);  // try to fix i2c issue
-
+    }
+    
       #ifdef DEBUG_ON  
       reboots = EEPROM.read(addr1);
       Serial.print("Reboots = ");
       Serial.println(reboots);
       #endif
   }
-    
+  
   theNodeID = radio.SENDERID;
 
   if (radio.ACK_REQUESTED)
@@ -650,17 +650,21 @@ void loop() {
   String n1 = "";
   bool sendRF = 0;
         
-  if (tResetRequested[nID] == 1) 
+  if (tResetRequested[nID] == 0) 
   {
     sendRF = 1;
-    n1 = "temp reset"; 
+    n1 = ""; 
     theData.node = theNodeID;
-    theData.tran = 99;
-    theData.batt = 0;
+    theData.tran = 3;
+    theData.batt = NETWORKID;
     theData.value1 = 0;
     theData.value2 = 0;
     theData.value3 = 0;
     theData.value4 = 0;
+    theData.value5 = 0;
+    theData.value6 = 0;
+    theData.value7 = 0;
+    theData.value8 = 0;
     #ifdef DEBUG_MIN
     Serial.print(" ..Node = ");
     Serial.print(theData.node);
@@ -669,17 +673,21 @@ void loop() {
     #endif
   }
   
-  if (tResetRequested[nID] == 0)
+  if (tResetRequested[nID] == 1)
   {
     sendRF = 1;
-    n1 = ""; 
+    n1 = "temp reset"; 
     theData.node = theNodeID;
-    theData.tran = 3;
-    theData.batt = 0;
+    theData.tran = 99;
+    theData.batt = NETWORKID;
     theData.value1 = 0;
     theData.value2 = 0;
     theData.value3 = 0;
     theData.value4 = 0;
+    theData.value5 = 0;
+    theData.value6 = 0;
+    theData.value7 = 0;
+    theData.value8 = 0;
     #ifdef DEBUG_MIN
     Serial.print(" ..Node = ");
     Serial.print(theData.node);
@@ -693,18 +701,42 @@ void loop() {
     sendRF = 1;
     n1 = "register node"; 
     theNodeID = 1;
-    theData.node = 1;
+    //theData.node = 5; //FIX - add ability to lookup nodeID
+    UNID = unusedNodeID();
+    if (UNID == 99) UNID = 1;
+    theData.node = UNID;
     theData.tran = 90;
-    theData.batt = 0;
-    theData.value1 = ENCRYPTKEYa;
-    theData.value2 = ENCRYPTKEYb;
-    theData.value3 = ENCRYPTKEYc;
-    theData.value4 = ENCRYPTKEYd;
+    theData.batt = NETWORKID;
+    theData.value1 = EK1[0] | uint16_t(EK1[1]) << 8;
+    theData.value2 = EK1[2] | uint16_t(EK1[3]) << 8;
+    theData.value3 = EK1[4] | uint16_t(EK1[5]) << 8;
+    theData.value4 = EK1[6] | uint16_t(EK1[7]) << 8;
+    theData.value5 = EK1[8] | uint16_t(EK1[9]) << 8;
+    theData.value6 = EK1[10] | uint16_t(EK1[11]) << 8;
+    theData.value7 = EK1[12] | uint16_t(EK1[13]) << 8;
+    theData.value8 = EK1[14] | uint16_t(EK1[15]) << 8;
+    
     #ifdef DEBUG_MIN
     Serial.print(" ..Node = ");
     Serial.print(theData.node);
     Serial.print(", Tran = ");
     Serial.println(theData.tran);
+    Serial.print(", v1 = ");
+    Serial.println(theData.value1);
+    Serial.print(", v2 = ");
+    Serial.println(theData.value2);
+    Serial.print(", v3 = ");
+    Serial.println(theData.value3);
+    Serial.print(", v4 = ");
+    Serial.println(theData.value4);
+    Serial.print(", v5 = ");
+    Serial.println(theData.value5);
+    Serial.print(", v6 = ");
+    Serial.println(theData.value6);
+    Serial.print(", v7 = ");
+    Serial.println(theData.value7);
+    Serial.print(", v8 = ");
+    Serial.println(theData.value8);
     #endif
   }
   
@@ -724,7 +756,17 @@ void loop() {
       //#ifdef DEBUG_MIN
       Serial.println(Time.timeStr() + ": OK ... " + n1 + " message sent to and received by Node " + theNodeID + " [Tran=" + theData.tran + "]");
       //#endif
-      if (registerNode == 0) tResetRequested[nID] = 0;
+      if (tResetRequested[nID] == 1) tResetRequested[nID] = 0;
+      
+      uint8_t UNIDUpdate = UNID + 100 - 1;
+      if (registerNode == 1)
+      {
+        Serial.print("************ UNIDUpdate = ");
+        Serial.println(UNIDUpdate);
+        EEPROM.update(UNIDUpdate, 1);
+        registerNode = 0;
+      }
+      // END FIX
     } 
     else 
     {
@@ -732,7 +774,8 @@ void loop() {
       Serial.println(Time.timeStr() + ": Fail ... " + n1 + " message NOT sent to and received by Node " + theNodeID + " [Tran=" + theData.tran + "]");
       //#endif
       //tResetRequested[theNodeID - 1] = 1;
-      if (registerNode == 0) tResetRequested[nID] = 1;
+      //if (tResetRequested[nID] == 1) tResetRequested[nID] = 1;
+      //if (registerNode == 1) clearAddNode == 1; // 
     }
 
     #ifdef DEBUG_ON          
@@ -888,6 +931,30 @@ int cloudResetReboots(String command)
 
 
 
+int manageNodes(String command)
+{
+    
+    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+    Wire.write("te|0|0|0|[" + command + "]|0|1");
+    Wire.endTransmission(true);
+  /*
+  // look for the matching argument "coffee" <-- max of 64 characters long
+  if(command == "1")
+  {
+    reboots = 0;
+    EEPROM.update(addr1, reboots);
+    #ifdef DEBUG_ON
+    Serial.print("Reboots = ");
+    Serial.println(reboots);
+    #endif
+    return 200;
+  }
+  else return -1;
+  */
+}
+
+
+
 int cloudResetWifi(String command)
 {
   // look for the matching argument "coffee" <-- max of 64 characters long
@@ -947,7 +1014,45 @@ void initializeRadio(uint8_t rfNetworkID, String rfEncryptkey)
   Serial.println(promiscuousMode);
   Serial.print("Power level = ");
   Serial.println(highPower);
-  Serial.print("Encryption key = ");
-  Serial.println(rfEncryptkey);
+  Serial.print("Encryption key = [");
+  Serial.print(rfEncryptkey);
+  Serial.println("]");
   //#endif
+}
+
+
+
+int unusedNodeID()
+{
+  Serial.print("\n-->Checking for unused Node IDs");
+  Serial.print("\n-->>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+  int unusedNodeID = 99;
+  for (uint8_t i = 0; i < numNodes; i++)
+  {
+    Serial.print("\nNode: ");
+    uint8_t n = i + 1;
+    Serial.print(n);
+    uint8_t addr = i + 100;
+    Serial.print(" Address: ");
+    Serial.print(addr);
+    uint8_t val = EEPROM.read(addr);
+    Serial.print(" Value: ");
+    Serial.print(val);
+    if (val == 0)
+    {
+      Serial.print(" = Unused Node ID ");
+      Serial.println(n);
+      unusedNodeID = n;
+      return unusedNodeID;
+    } 
+  }
+  if (unusedNodeID == 99)
+  {
+    for (uint8_t i = 0; i < numNodes; i++)
+    {
+      uint8_t addr = i + 100;
+      EEPROM.update(addr, 0);
+    }
+  }
+  return unusedNodeID;  // return node number or error message
 }
