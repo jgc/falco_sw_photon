@@ -50,8 +50,8 @@ unsigned int lastPublish = 0;
 #define IS_RFM69HW      //uncomment only for RFM69HW! Leave out if you have RFM69W!
 #define ACK_TIME        450 // max # of ms to wait for an ack default 30
 #define SERIAL_BAUD     9600 // 57600
-#define SW1             D4
-#define buttonPin       D4 //FIX 
+#define SW1             D5 //was D4
+#define buttonPin       D5 // was D4 FIX 
 #define LED             D7 
 #define ledPin          D7 //FIX
 
@@ -130,11 +130,32 @@ unsigned long delayStartTime = 0;
 unsigned long delayMS = 0;
 
 // the Button
-const int buttonPin1 = 4;
+const int buttonPin1 = buttonPin;
 ClickButton button1(buttonPin1, HIGH, CLICKBTN_PULLUP);
 int8_t function = 0; // was int
 int button1State = 0;
 
+
+char* dataArray[] = {"test1|5000|xxxxxxxxxxxxxxxxxx", 
+"test01|2000|xxxxxxxxxxxxxxxxxx",
+"test02|2000|xxxxxxxxxxxxxxxxxx",
+"test03|2000|xxxxxxxxxxxxxxxxxx",
+"test04|1000|xxxxxxxxxxxxxxxxxx",
+"test05|1000|xxxxxxxxxxxxxxxxxx",
+"test06|2000|xxxxxxxxxxxxxxxxxx",
+"test07|1000|xxxxxxxxxxxxxxxxxx",
+"test08|1000|xxxxxxxxxxxxxxxxxx",
+"test09|2000|xxxxxxxxxxxxxxxxxx",
+"test10|2000|xxxxxxxxxxxxxxxxxx",
+"test11|2000|xxxxxxxxxxxxxxxxxx",
+"test12|2000|xxxxxxxxxxxxxxxxxx",
+"test13|1000|xxxxxxxxxxxxxxxxxx",
+"test14|1000|xxxxxxxxxxxxxxxxxx",
+"test15|2000|xxxxxxxxxxxxxxxxxx",
+"test16|1000|xxxxxxxxxxxxxxxxxx",
+"test17|1000|xxxxxxxxxxxxxxxxxx",
+"test18|20000|xxxxxxxxxxxxxxxxxx"
+};
 
 
 //**** START SETUP ****
@@ -158,9 +179,8 @@ void setup() {
   pinMode(LED, OUTPUT);
   digitalWrite(LED, HIGH);
   
-  pinMode(SW1, INPUT_PULLDOWN);
-  //pinMode(D4, INPUT_PULLDOWN); 
-  //pinMode(D4, INPUT_PULLUP);
+  pinMode(buttonPin1, INPUT_PULLDOWN);
+  //pinMode(buttonPin1, INPUT_PULLUP); 
   // Setup button timers (all in milliseconds / ms)
   // (These are default if not set, but changeable for convenience)
   button1.debounceTime   = 20;   // Debounce timer in ms
@@ -211,8 +231,7 @@ void setup() {
 #endif
   
   Particle.subscribe("hook-response/temperature1", tempResponse, MY_DEVICES);
-  pinMode(LED, OUTPUT);
-  
+
   initializeRadio(NETWORKID, EK1);
   
   randomSeed(newSeed);
@@ -251,7 +270,7 @@ void setup() {
   delay(500);  // try to fix i2c issue
   
   Wire.beginTransmission(OTHER_ADDRESS);
-  Wire.write("te|0|0|0|Startup completed|0|0");
+  Wire.write("te|0|0|0|Waiting for data|0|0");
   Wire.endTransmission(true);
  
  
@@ -571,6 +590,14 @@ void loop() {
     String value1 = "{ \"node\": \"" + String(theData.node) + "\", \"volts\": \"" + String(batt2) + "\", \"temp1\": \"" + String(temp2) + "\", \"sVersion\": \"" + String(SW1Counter) + "\"  }";
     String value2 = "dt|" + String(theNodeID) + "|" + String(batt1) + "|" + String(temp1) + "|" + String(tMin) + "|" + String(tMax)  + "|" + String(tFlag);
     
+    /*
+    Codes:
+    te = text
+    rt = reset temp
+    dt = display tem
+    String value2 = "10|" + String(theNodeID) + "|" + String(batt1) + "|" + String(temp1) + "|" + String(tMin) + "|" + String(tMax)  + "|" + String(tFlag);
+    */
+    
     #ifdef DEBUG_MIN
     Serial.println("Pinging started...");
     #endif
@@ -609,9 +636,9 @@ void loop() {
     {
       Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
       Wire.write(value2);
-      delay(100);  // try to fix i2c issue
+      //delay(100);  // try to fix i2c issue
       Wire.endTransmission(true);    // stop transmitting
-      delay(100);  // try to fix i2c issue
+      //delay(100);  // try to fix i2c issue
     }
     
       #ifdef DEBUG_ON  
