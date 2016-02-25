@@ -10,7 +10,6 @@
 // Improve sequencing of data transmissions, ACKs and checks for connectivity
 //
 
-
 #include "application.h"
 #include "RFM69.h"
 #include "RFM69registers.h"
@@ -30,7 +29,7 @@ PRODUCT_ID(162);
 
 
 #define sDesc "Falco Manager"
-#define sVersion "v0.5.6"
+#define sVersion "v0.5.8"
 #define hVersion "v0.5.0"
 #define tStars "***************************"
 
@@ -110,8 +109,9 @@ int cloudReset(String command);
 IPAddress remoteIP(181,224,135,60);
 int numberOfReceivedPackage = 0;
 
-bool registerNode = 0;  //used
-bool clearAddNode = 0;
+uint8_t addNodeStatus = 0;
+uint8_t resetTempStatus = 0;
+
 boolean nodePresent[9]; // used
 int UNID = 99;
 unsigned long lastData[9];
@@ -125,7 +125,6 @@ uint8_t numNodes = 9;
 #define MINUTES_5 (5 * 60 * 1000)
 unsigned long lastDataCheck = millis();
 
-// (millis() - delayStartTime > delayMS)
 unsigned long delayStartTime = 0;
 unsigned long delayMS = 0;
 
@@ -136,26 +135,13 @@ int8_t function = 0; // was int
 int button1State = 0;
 
 
+/*
 char* dataArray[] = {"test1|5000|xxxxxxxxxxxxxxxxxx", 
 "test01|2000|xxxxxxxxxxxxxxxxxx",
 "test02|2000|xxxxxxxxxxxxxxxxxx",
 "test03|2000|xxxxxxxxxxxxxxxxxx",
-"test04|1000|xxxxxxxxxxxxxxxxxx",
-"test05|1000|xxxxxxxxxxxxxxxxxx",
-"test06|2000|xxxxxxxxxxxxxxxxxx",
-"test07|1000|xxxxxxxxxxxxxxxxxx",
-"test08|1000|xxxxxxxxxxxxxxxxxx",
-"test09|2000|xxxxxxxxxxxxxxxxxx",
-"test10|2000|xxxxxxxxxxxxxxxxxx",
-"test11|2000|xxxxxxxxxxxxxxxxxx",
-"test12|2000|xxxxxxxxxxxxxxxxxx",
-"test13|1000|xxxxxxxxxxxxxxxxxx",
-"test14|1000|xxxxxxxxxxxxxxxxxx",
-"test15|2000|xxxxxxxxxxxxxxxxxx",
-"test16|1000|xxxxxxxxxxxxxxxxxx",
-"test17|1000|xxxxxxxxxxxxxxxxxx",
-"test18|20000|xxxxxxxxxxxxxxxxxx"
 };
+*/
 
 
 //**** START SETUP ****
@@ -251,29 +237,22 @@ void setup() {
   Serial.print("WifiOff = ");
   Serial.println(wifiOff);
   #endif
-  
-  //String valueSU;
- 
-  Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-  Wire.write("te|0|0|0|" + String(sDesc) + "|0|1");
-  Wire.endTransmission(true);    // stop transmitting
+
+  wireTrans("te|0|0|0||0|0");  
+  delay(5000);
+  wireTrans("te|0|0|0|" + String(sDesc) + "|0|1");
   delay(500);
-  
-  Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-  Wire.write("te|0|0|0|SW: " + String(sVersion) + "|0|1");
-  Wire.endTransmission(true);    // stop transmitting
+  wireTrans("te|0|0|0||0|0");
   delay(500);
-  
-  Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-  Wire.write("te|0|0|0|HW: " + String(hVersion) + "|0|1");
-  Wire.endTransmission(true);    // stop transmitting
-  delay(500);  // try to fix i2c issue
-  
-  Wire.beginTransmission(OTHER_ADDRESS);
-  Wire.write("te|0|0|0|Waiting for data|0|0");
-  Wire.endTransmission(true);
- 
- 
+  wireTrans("te|0|0|0|SW: " + String(sVersion) + "|0|1");
+  delay(500);
+  wireTrans("te|0|0|0||0|0");
+  delay(500);
+  wireTrans("te|0|0|0|HW: " + String(hVersion) + "|0|1");
+  delay(500);
+  wireTrans("te|0|0|0|Waiting for data|0|0");
+  delay(500);
+
  //Mark all nodes as present - FUTURE allow for only specified devices to be added
   for (int i = 0; i < numNodes; i++) {
     nodePresent[i] = 0; //FIX ?? breaks reset, see fix below
@@ -339,142 +318,76 @@ void loop() {
       {
         nodeDataMissing[i] = 1;
         int nv = i + 1;
-        String wireMD = "md|" + String(nv) + "|0|0|0|0|0";
-        //[tran|node|batt|value1|value2|value3|tFlag]
-        Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-        Wire.write(wireMD);
-        Wire.endTransmission(true);    // stop transmitting
+        wireTrans("md|" + String(nv) + "|0|0|0|0|0");
         #ifdef DEBUG_MIN      
         Serial.print("Node ");
         Serial.print(i + 1);
         Serial.print(" data out of date. Sent [");
-        Serial.print(wireMD);
+        Serial.print("md|" + String(nv) + "|0|0|0|0|0");
         Serial.println("]");
         #endif
       }
     }
   }
   
-  //if ((clearAddNode == 1) && (millis() - delayStartTime > (2*delayMS)))
-  if ((clearAddNode == 1) && (millis() - delayStartTime > delayMS))
+  
+  if ((addNodeStatus ==2) && (millis() - delayStartTime > delayMS))
   {
     initializeRadio(NETWORKID, EK1);
-    registerNode = 0;
-    clearAddNode = 0;
-    Serial.println("Node add failed ...");
-    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-    Wire.write("te|0|0|0|Node add FAILED|0|1");
-    Wire.endTransmission(true);
-    delay(1000);
-    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-    Wire.write("te|0|0|0|Node add FAILED|0|0");
-    Wire.endTransmission(true);
+    addNodeStatus = 0;
+    Serial.println("Node add failed");
+    wireTrans("te|0|0|0|Add timeout|0|1");
+    delay(500);
+    wireTrans("te|0|0|0||0|0");
   }
+  
   
   button1.Update();
-  if (button1.clicks != 0) function = button1.clicks;
-
-  // **** FUTURE **** Add web based reset with ability to specify node
-  //if (button1State != 0) function = button1State;
+  function = button1.clicks;
     
-  // Add new node
-  if (function < 0)
+  if (function < 0)  // Long click, check if node to be added
   {
-    //#ifdef DEBUG_ON  
-    Serial.print("Button 1 = ");
-    Serial.println(function);
-    function = 0;
-    //#endif
-    
-    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-    Wire.write("te|0|0|0|Click to add node|0|1");
-    Wire.endTransmission(true);
-    clearAddNode = 1;
-    
-    function = 0;
+    wireTrans("te|0|0|0|Click to add node|0|0");
+    addNodeStatus = 1;
+    delay(500);
     delayStartTime = millis();
-    //delayMS = 4000;
-    delayMS = 15000;
+    delayMS = 15000;  //delayMS = 4000;
     while ((millis() - delayStartTime < delayMS))
     {
-      button1.Update();
-      //Serial.print(".");
-      if (button1.clicks != 0) function = button1.clicks;
- 
-      if (function != 0) 
-      {
-        //#ifdef DEBUG_ON  
-        Serial.print("\nButton 2 = ");
-        Serial.println(function);
-        function = 0;
-        //#endif
-        
-        function = 0;
-        registerNode = 1;  
-        clearAddNode = 1;
-        Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-        Wire.write("te|0|0|0|Waiting ...|0|1");
-        Wire.endTransmission(true);
-        
-        //#ifdef DEBUG_ON  
-        Serial.println("Waiting  ...");
-        function = 0;
-        //#endif
-        
-        initializeRadio(NETWORKID_SU, EK_SU);
-      }
+      //wireTrans("te|0|0|0|.|0|0");      
       delay(5);
-      
-      if (registerNode == 1) break;
+      button1.Update();
+      function = button1.clicks;
+      if (function > 0)  // ie a short button click
+      {
+        addNodeStatus = 2;  
+        wireTrans("te|0|0|0|Waiting ...|0|1");
+        initializeRadio(NETWORKID_SU, EK_SU);
+        break;
+      }
+      //delay(10);
     }
-    function = 0;
-    /*
-    Serial.println("\nNode add failed  ...");
-    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-    Wire.write("te|0|0|0|Node add failed|0|1");
-    Wire.endTransmission(true);
-    delay(1000);
-    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-    Wire.write("te|0|0|0|Node add failed|0|0");
-    Wire.endTransmission(true);
-    */
+    if (addNodeStatus == 1)
+    {
+      wireTrans("te|0|0|0|Add failed|0|1");
+      addNodeStatus = 0;
+      delay(500);
+      wireTrans("te|0|0|0||0|0");
+    }
   }
+
   
-  // Reset all temperatures on the display
-  if (function > 0)
+  if (function > 0 && addNodeStatus == 0)
   {
-    //SW1Counter = 0;
-    function = 0;
-    
-    #ifdef DEBUG_ON  
-    Serial.print("Button = ");
-    Serial.println(function);
-    #endif
-    
-    String value3 = "rt|999|0|0|0|0|0";
-    Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-    Wire.write(value3);
-    Wire.endTransmission(true);
-    
-    #ifdef DEBUG_ON  
-    Serial.print(Time.timeStr());
-    Serial.print(" [");
-    Serial.print(value3);
-    Serial.println("]");
-    #endif
-    
+    function = 0; // reset variable for button1.clicks
+    wireTrans("rt|999|0|0|0|0|0");
     for (int i = 0; i < numNodes; i++) {
       //if (nodePresent[i] == 1) //FIX *************************
-      {
+      //{
         tResetRequested[i] = 1;
         tResetCompleted[i] = 1;
-        #ifdef DEBUG_ON         
-        Serial.print("tResetRequested [node ");
-        Serial.print(i + 1);
-        Serial.print("] = ");
-        Serial.println(tResetRequested[i]);
-        #endif
-      }
+        printNodeStatus();
+      //}
     }
   }
       
@@ -634,13 +547,8 @@ void loop() {
 
     if (theData.tran == 2)
     {
-      Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-      Wire.write(value2);
-      //delay(100);  // try to fix i2c issue
-      Wire.endTransmission(true);    // stop transmitting
-      //delay(100);  // try to fix i2c issue
+      wireTrans(value2);
     }
-    
       #ifdef DEBUG_ON  
       reboots = EEPROM.read(addr1);
       Serial.print("Reboots = ");
@@ -723,7 +631,7 @@ void loop() {
     #endif
   }   
   
-  if (registerNode == 1)
+  if (addNodeStatus == 2)
   {
     sendRF = 1;
     n1 = "register node"; 
@@ -780,75 +688,62 @@ void loop() {
   {
     if (radio.sendWithRetry(theNodeID, (const void*)(&theData), sizeof(theData)), 1) // node must be a byte
     { 
-      //#ifdef DEBUG_MIN
+      
       Serial.println(Time.timeStr() + ": OK ... " + n1 + " message sent to and received by Node " + theNodeID + " [Tran=" + theData.tran + "]");
-      //#endif
+      
       if (tResetRequested[nID] == 1) tResetRequested[nID] = 0;
       
-      uint8_t UNIDUpdate = UNID + 100 - 1;
-      if (registerNode == 1)
-      {
+      if (addNodeStatus == 2)
+      { 
+        addNodeStatus = 0;
+        uint8_t UNIDUpdate = UNID + 100 - 1;
         Serial.print("************ UNIDUpdate = ");
         Serial.println(UNIDUpdate);
         EEPROM.update(UNIDUpdate, 1);
-        registerNode = 0;
+        wireTrans("te|0|0|0|Node " + String(UNID) + " added.|0|1");
+        delay(500);
+        wireTrans("te|0|0|0||0|0");
+        initializeRadio(NETWORKID, EK1);
       }
-      // END FIX
     } 
     else 
     {
       //#ifdef DEBUG_MIN
       Serial.println(Time.timeStr() + ": Fail ... " + n1 + " message NOT sent to and received by Node " + theNodeID + " [Tran=" + theData.tran + "]");
       //#endif
-      //tResetRequested[theNodeID - 1] = 1;
-      //if (tResetRequested[nID] == 1) tResetRequested[nID] = 1;
-      //if (registerNode == 1) clearAddNode == 1; // 
+      
+      if (tResetRequested[nID] == 1) tResetRequested[nID] = 0;
+      
+      if (addNodeStatus == 2)
+      { 
+        wireTrans("te|0|0|0|Node " + String(UNID) + " FAIL.|0|1");
+        delay(500);
+        wireTrans("te|0|0|0|.|0|0");
+        //initializeRadio(NETWORKID, EK1);
+      }
     }
-
-    #ifdef DEBUG_ON          
-    for (int i = 0; i < numNodes; i++) 
-    {
-      Serial.print("tResetRequested [node ");
-      Serial.print(i + 1);
-      Serial.print("] = ");
-      Serial.println(tResetRequested[i]);
-    }
-    #endif
-
     sendRF = 0;
-    
   }    
 
-  #ifdef DEBUG_ON          
-  for (int i = 0; i < numNodes; i++) 
-  {
-    Serial.print("lastData [node ");
-    Serial.print(i + 1);
-    Serial.print("] = ");
-    Serial.println(lastData[i]);
-  }
-  #endif
-   
-  #ifdef DEBUG_MIN  
-  mem1 = System.freeMemory();
-  Serial.print("Free memory=");
-  Serial.println(mem1);
-  #endif
-
-  #ifdef DEBUG_ON
-  Serial.println();
-  #endif    
-
+  printNodeStatus();
+  displayFreeMem(); 
   } // END receiveDone()
+
 }
+
+
+
 // **** END LOOP ****
 // **** END LOOP ****
 // **** END LOOP ****
 
 
+
 // **** START FUNCTIONS ****
 // **** START FUNCTIONS ****
 // **** START FUNCTIONS ****
+
+
 
 void Blink(byte PIN, int DELAY_MS)
 {
@@ -958,11 +853,11 @@ int cloudResetReboots(String command)
 
 
 
-int manageNodes(String command)
+int manageNodes(String command)  // FUTURE - use to repotely set values
 {
     
     Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
-    Wire.write("te|0|0|0|[" + command + "]|0|1");
+    Wire.write("te|0|0|0|[" + command + "]|0|0");
     Wire.endTransmission(true);
   /*
   // look for the matching argument "coffee" <-- max of 64 characters long
@@ -1016,11 +911,14 @@ int rndInt(int intToRnd)
 
 
 
-void connect() {
-  if (Particle.connected() == false) {
+void connect() 
+{
+  if (Particle.connected() == false) 
+  {
     Particle.connect();
   }
 }
+
 
 
 void initializeRadio(uint8_t rfNetworkID, String rfEncryptkey)
@@ -1032,8 +930,8 @@ void initializeRadio(uint8_t rfNetworkID, String rfEncryptkey)
   #endif
   radio.encrypt(rfEncryptkey);
   radio.promiscuous(promiscuousMode);
-
-  //#ifdef DEBUG_ON
+  delay(100);
+  #ifdef DEBUG_ON
   char buff[50];
   sprintf(buff, "\nListening at %d Mhz...", FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
   Serial.println(buff);
@@ -1044,7 +942,7 @@ void initializeRadio(uint8_t rfNetworkID, String rfEncryptkey)
   Serial.print("Encryption key = [");
   Serial.print(rfEncryptkey);
   Serial.println("]");
-  //#endif
+  #endif
 }
 
 
@@ -1082,4 +980,39 @@ int unusedNodeID()
     }
   }
   return unusedNodeID;  // return node number or error message
+}
+
+
+
+void wireTrans(String wt)
+{
+  Wire.beginTransmission(OTHER_ADDRESS); // transmit to slave device #4
+  Wire.write(wt);
+  Wire.endTransmission(true);    // stop transmitting
+} 
+
+  
+  
+void printNodeStatus()
+{
+  #ifdef DEBUG_ON         
+  Serial.print("Node = [");
+  Serial.print(i + 1);
+  Serial.print("] tResetRequested = [");
+  Serial.println(tResetRequested[i]);
+  Serial.print("]\tlastData = [ ");
+  Serial.print(lastData[i]);
+  Serial.print("]");
+  #endif
+}
+
+
+
+void displayFreeMem()
+{
+  #ifdef DEBUG_MIN  
+  mem1 = System.freeMemory();
+  Serial.print("Free memory=");
+  Serial.println(mem1);
+  #endif
 }
