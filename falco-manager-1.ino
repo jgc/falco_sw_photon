@@ -29,7 +29,7 @@ PRODUCT_ID(162);
 
 
 #define sDesc "Falco Manager"
-#define sVersion "v0.5.8"
+#define sVersion "v0.5.8.2"
 #define hVersion "v0.5.0"
 #define tStars "***************************"
 
@@ -337,7 +337,7 @@ void loop() {
     addNodeStatus = 0;
     Serial.println("Node add failed");
     wireTrans("te|0|0|0|Add timeout|0|1");
-    delay(500);
+    delay(1000);
     wireTrans("te|0|0|0||0|0");
   }
   
@@ -347,7 +347,7 @@ void loop() {
     
   if (function < 0)  // Long click, check if node to be added
   {
-    wireTrans("te|0|0|0|Click to add node|0|0");
+    wireTrans("te|0|0|0|Click to add node|0|1");
     addNodeStatus = 1;
     delay(500);
     delayStartTime = millis();
@@ -371,7 +371,7 @@ void loop() {
     {
       wireTrans("te|0|0|0|Add failed|0|1");
       addNodeStatus = 0;
-      delay(500);
+      delay(1000);
       wireTrans("te|0|0|0||0|0");
     }
   }
